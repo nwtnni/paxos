@@ -10,15 +10,15 @@ pub struct BallotID {
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Ballot<O> {
-    pub id: BallotID,
+    pub b_id: BallotID,
     pub op: O,
 }
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PValue<O> {
-    pub slot: usize,
-    pub id: BallotID,
+    pub s_id: usize,
+    pub b_id: BallotID,
     pub op: O,
 }
 
