@@ -5,6 +5,9 @@ authors = ["Newton Ni <nwtnni@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+futures-preview = "0.3.0-alpha.10"
+hashbrown = "0.1"
+parking_lot = "0.7"
 serde = "1.0"
 serde_derive = "1.0"
 tokio-serde-bincode = "0.2"

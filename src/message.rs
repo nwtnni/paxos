@@ -47,3 +47,10 @@ pub struct Decision<O> {
     pub slot: usize,
     pub op: O,
 }
+
+#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Out<O> {
+    P1B(P1B<O>), 
+    P2B(P2B),
+}
