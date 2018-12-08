@@ -31,26 +31,23 @@ impl<O: Clone> State<O> {
         self.0.remove(&id);
     }
 
-    pub fn send(&self, id: usize, message: peer::In<O>) -> peer::SendResult<O> {
+    pub fn send(&self, id: usize, message: peer::In<O>) {
         if let Some(tx) = self.0.get(&id) {
-            tx.unbounded_send(message)?;
+            let _ = tx.unbounded_send(message);
         }
-        Ok(())
     }
 
-    pub fn broadcast(&self, message: peer::In<O>) -> peer::SendResult<O> {
-        for tx in self.0.values() {
-            tx.unbounded_send(message.clone())?;
+    pub fn broadcast(&self, message: peer::In<O>) {
+        for id in self.0.keys() {
+            self.send(*id, message.clone());
         }
-        Ok(())
     }
 
-    pub fn narrowcast<I>(&self, ids: I, message: peer::In<O>) -> peer::SendResult<O>
-        where I: IntoIterator<Item = usize>
+    pub fn narrowcast<'a, I>(&self, ids: I, message: peer::In<O>)
+        where I: IntoIterator<Item = &'a usize>
     {
         for id in ids.into_iter() {
-            self.send(id, message.clone())?;
+            self.send(*id, message.clone());
         }
-        Ok(())
     }
 }

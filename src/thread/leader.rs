@@ -12,15 +12,11 @@ use crate::state;
 
 #[derive(Clone, Debug)]
 pub enum In<O> {
-    P1A(Vec<usize>, message::P1A),
-    P2A(Vec<usize>, message::P2A<O>),
     Propose(message::Proposal<O>),
     Preempt(message::BallotID),
     Adopt(message::BallotID, Vec<message::PValue<O>>),
     Decide(message::Proposal<O>),
 }
-
-pub type SendResult<O> = Result<(), mpsc::SendError<In<O>>>;
 
 pub struct Leader<O> {
     id: usize,
@@ -51,6 +47,7 @@ impl<O: state::Operation> Leader<O> {
         };
         let (commander, commander_tx) = commander::Commander::new(
             self.self_tx.clone(),
+            self.peer_txs.clone(),
             pvalue,
             self.count,
         );
@@ -61,6 +58,7 @@ impl<O: state::Operation> Leader<O> {
     async fn spawn_scout(&mut self) {
         let (scout, scout_tx) = scout::Scout::new(
             self.self_tx.clone(),
+            self.peer_txs.clone(),
             self.ballot,
             self.count,
             self.backoff,

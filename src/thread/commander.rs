@@ -5,19 +5,18 @@ use tokio::timer;
 
 use crate::constants::COMMANDER_TIMEOUT;
 use crate::message;
+use crate::shared;
 use crate::state;
-use crate::thread::{Tx, Rx};
-use crate::thread::leader;
+use crate::thread::{leader, peer, Tx, Rx};
 
 pub type In = message::P2B;
 
 pub type ID = (message::BallotID, usize);
 
-pub type SendResult = Result<(), mpsc::SendError<In>>;
-
 pub struct Commander<O> {
     rx: Rx<In>,
-    tx: Tx<leader::In<O>>,
+    leader_tx: Tx<leader::In<O>>,
+    peer_txs: shared::Shared<O>,
     waiting: Set<usize>,
     minority: usize,
     pvalue: message::PValue<O>,
@@ -25,14 +24,20 @@ pub struct Commander<O> {
 }
 
 impl<O: state::Operation> Commander<O> {
-    pub fn new(tx: Tx<leader::In<O>>, pvalue: message::PValue<O>, count: usize) -> (Self, Tx<In>) {
+    pub fn new(
+        leader_tx: Tx<leader::In<O>>,
+        peer_txs: shared::Shared<O>,
+        pvalue: message::PValue<O>,
+        count: usize
+    ) -> (Self, Tx<In>) {
         let waiting = (0..count).collect();
         let minority = (count - 1) / 2;
         let timeout = timer::Interval::new_interval(COMMANDER_TIMEOUT);
         let (self_tx, self_rx) = mpsc::unbounded();
         let commander = Commander {
             rx: self_rx,
-            tx,
+            leader_tx,
+            peer_txs,
             waiting,
             minority,
             pvalue,
@@ -41,12 +46,12 @@ impl<O: state::Operation> Commander<O> {
         (commander, self_tx)
     }
 
-    pub async fn run(mut self) -> leader::SendResult<O> {
+    pub async fn run(mut self) {
         'outer: loop {
 
             // Narrowcast P2A to acceptors who haven't responded
             while let Some(_) = await!(self.timeout.next()) {
-                self.send_p2a()?;    
+                self.send_p2a();    
             }
 
             // Respond to incoming P2B messages
@@ -59,7 +64,7 @@ impl<O: state::Operation> Commander<O> {
 
                     // Notify leader that we've achieved a majority
                     if self.waiting.len() <= self.minority {
-                        self.send_decide()?;
+                        self.send_decide();
                         break 'outer
                     }
                 }
@@ -67,33 +72,34 @@ impl<O: state::Operation> Commander<O> {
                 // Notify leader that we've been preempted
                 else {
                     debug_assert!(p2b.b_id > self.pvalue.b_id);
-                    self.send_preempt(p2b.b_id)?;
+                    self.send_preempt(p2b.b_id);
                     break 'outer
                 }
             }
-
         }
-        Ok(())
     }
 
-    fn send_p2a(&self) -> leader::SendResult<O> {
-        let waiting = self.waiting.iter()
-            .cloned()
-            .collect();
-        let p2a = leader::In::P2A(waiting, self.pvalue.clone());
-        self.tx.unbounded_send(p2a)
+    fn send_p2a(&self) {
+        let p2a = peer::In::P2A(self.pvalue.clone());
+        self.peer_txs
+            .read()
+            .narrowcast(&self.waiting, p2a);
     }
 
-    fn send_decide(self) -> leader::SendResult<O> {
+    fn send_decide(self) {
         let decide = leader::In::Decide(message::Proposal {
             s_id: self.pvalue.s_id,
             op: self.pvalue.op,
         });
-        self.tx.unbounded_send(decide)
+        self.leader_tx
+            .unbounded_send(decide)
+            .expect("[INTERNAL ERROR]: failed to send decision");
     }
 
-    fn send_preempt(self, b_id: message::BallotID) -> leader::SendResult<O> {
+    fn send_preempt(self, b_id: message::BallotID) {
         let preempt = leader::In::Preempt::<O>(b_id); 
-        self.tx.unbounded_send(preempt)
+        self.leader_tx
+            .unbounded_send(preempt)
+            .expect("[INTERNAL ERROR]: failed to send preempted");
     }
 }

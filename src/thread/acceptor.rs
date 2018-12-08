@@ -24,18 +24,18 @@ pub struct Acceptor<O> {
 }
 
 impl<O: state::Operation> Acceptor<O> {
-    pub async fn run(mut self) -> peer::SendResult<O> {
+    pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.rx.next()) {
                 match message {
-                | In::P1A(m) => self.send_p1a(m)?,
-                | In::P2A(m) => self.send_p2a(m)?,
+                | In::P1A(m) => self.send_p1a(m),
+                | In::P2A(m) => self.send_p2a(m),
                 }
             }
         }
     }
 
-    fn send_p1a(&mut self, ballot: message::P1A) -> peer::SendResult<O> {
+    fn send_p1a(&mut self, ballot: message::P1A) {
         self.ballot = std::cmp::max(ballot, self.ballot);
         let p1b = peer::In::P1B(message::P1B {
             a_id: self.id,
@@ -47,7 +47,7 @@ impl<O: state::Operation> Acceptor<O> {
         self.tx.read().send(ballot.l_id, p1b)
     }
 
-    fn send_p2a(&mut self, pvalue: message::P2A<O>) -> peer::SendResult<O> {
+    fn send_p2a(&mut self, pvalue: message::P2A<O>) {
         if pvalue.b_id >= self.ballot {
             self.ballot = pvalue.b_id;
             self.accepted.insert(pvalue.s_id, pvalue.clone());
