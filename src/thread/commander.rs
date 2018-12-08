@@ -3,6 +3,7 @@ use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::timer;
 
+use crate::constants::COMMANDER_TIMEOUT;
 use crate::message;
 use crate::thread::{Tx, Rx};
 use crate::thread::leader;
@@ -19,15 +20,31 @@ pub struct Commander<O> {
     waiting: Set<usize>,
     minority: usize,
     pvalue: message::PValue<O>,
-    interval: timer::Interval,
+    timeout: timer::Interval,
 }
 
 impl<O: Clone> Commander<O> {
+    pub fn new(tx: Tx<leader::In<O>>, pvalue: message::PValue<O>, count: usize) -> (Self, Tx<In>) {
+        let waiting = (0..count).collect();
+        let minority = (count - 1) / 2;
+        let timeout = timer::Interval::new_interval(COMMANDER_TIMEOUT);
+        let (self_tx, self_rx) = mpsc::unbounded();
+        let commander = Commander {
+            rx: self_rx,
+            tx,
+            waiting,
+            minority,
+            pvalue,
+            timeout,
+        };
+        (commander, self_tx)
+    }
+
     pub async fn run(mut self) -> leader::SendResult<O> {
         'outer: loop {
 
             // Narrowcast P2A to acceptors who haven't responded
-            while let Some(_) = await!(self.interval.next()) {
+            while let Some(_) = await!(self.timeout.next()) {
                 self.send_p2a()?;    
             }
 

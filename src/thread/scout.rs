@@ -3,6 +3,7 @@ use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::timer;
 
+use crate::constants::SCOUT_TIMEOUT;
 use crate::message;
 use crate::thread::{Tx, Rx};
 use crate::thread::leader;
@@ -18,15 +19,33 @@ pub struct Scout<O> {
     minority: usize,
     ballot: message::BallotID,
     pvalues: Set<message::PValue<O>>,
-    interval: timer::Interval,
+    timeout: timer::Interval,
 }
 
 impl<O: Eq + std::hash::Hash> Scout<O> {
+    pub fn new(tx: Tx<leader::In<O>>, ballot: message::BallotID, count: usize) -> (Self, Tx<In<O>>) {
+        let waiting = (0..count).collect();  
+        let minority = (count - 1) / 2;
+        let timeout = timer::Interval::new_interval(SCOUT_TIMEOUT);
+        let pvalues = Set::default();
+        let (self_tx, self_rx) = mpsc::unbounded();
+        let scout = Scout {
+            rx: self_rx,
+            tx,
+            waiting,
+            minority,
+            ballot,
+            pvalues,
+            timeout,
+        };
+        (scout, self_tx)
+    }
+
     pub async fn run(mut self) -> leader::SendResult<O> {
         'outer: loop {
 
             // Narrowcast P1A to acceptors who haven't responded
-            while let Some(Ok(_)) = await!(self.interval.next()) {
+            while let Some(Ok(_)) = await!(self.timeout.next()) {
                 self.send_p1a()?;
             }
 
