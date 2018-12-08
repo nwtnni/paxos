@@ -67,7 +67,7 @@ impl<O: Eq + std::hash::Hash> Scout<O> {
         self.tx.unbounded_send(p1a)
     }
 
-    fn send_adopt(mut self, b_id: message::BallotID) -> leader::SendResult<O> {
+    fn send_adopt(self, b_id: message::BallotID) -> leader::SendResult<O> {
         let pvalues = self.pvalues.into_iter()
             .collect();
         let adopt = leader::In::Adopt(b_id, pvalues);

@@ -43,7 +43,7 @@ pub struct P2B {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Decision<O> {
-    pub slot: usize,
+pub struct Proposal<O> {
+    pub s_id: usize,
     pub op: O,
 }

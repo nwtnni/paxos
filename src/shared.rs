@@ -38,6 +38,13 @@ impl<O: Clone> State<O> {
         Ok(())
     }
 
+    pub fn broadcast(&self, message: peer::In<O>) -> peer::SendResult<O> {
+        for tx in self.0.values() {
+            tx.unbounded_send(message.clone())?;
+        }
+        Ok(())
+    }
+
     pub fn narrowcast<I>(&self, ids: I, message: peer::In<O>) -> peer::SendResult<O>
         where I: IntoIterator<Item = usize>
     {

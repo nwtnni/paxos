@@ -67,7 +67,10 @@ impl<O: Clone> Commander<O> {
     }
 
     fn send_decide(self) -> leader::SendResult<O> {
-        let decide = leader::In::Decide(self.pvalue);
+        let decide = leader::In::Decide(message::Proposal {
+            s_id: self.pvalue.s_id,
+            op: self.pvalue.op,
+        });
         self.tx.unbounded_send(decide)
     }
 
