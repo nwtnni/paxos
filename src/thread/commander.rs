@@ -17,10 +17,8 @@ pub struct Commander<O> {
     interval: timer::Interval,
 }
 
-type SendError<O> = mpsc::SendError<leader::In<O>>;
-
 impl<O: Clone> Commander<O> {
-    pub async fn run(mut self) -> Result<(), SendError<O>> {
+    pub async fn run(mut self) -> leader::SendResult<O> {
         'outer: loop {
 
             // Narrowcast P2A to acceptors who haven't responded
@@ -55,7 +53,7 @@ impl<O: Clone> Commander<O> {
         Ok(())
     }
 
-    fn send_p2a(&self) -> Result<(), SendError<O>> {
+    fn send_p2a(&self) -> leader::SendResult<O> {
         let waiting = self.waiting.iter()
             .cloned()
             .collect();
@@ -63,14 +61,13 @@ impl<O: Clone> Commander<O> {
         self.tx.unbounded_send(p2a)
     }
 
-    fn send_decide(self) -> Result<(), SendError<O>> {
+    fn send_decide(self) -> leader::SendResult<O> {
         let decide = leader::In::Decide(self.pvalue);
         self.tx.unbounded_send(decide)
     }
 
-    fn send_preempt(self, b_id: message::BallotID) -> Result<(), SendError<O>> {
+    fn send_preempt(self, b_id: message::BallotID) -> leader::SendResult<O> {
         let preempt = leader::In::Preempt::<O>(b_id); 
         self.tx.unbounded_send(preempt)
     }
-
 }

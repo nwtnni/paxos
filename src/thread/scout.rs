@@ -18,10 +18,8 @@ pub struct Scout<O> {
     interval: timer::Interval,
 }
 
-type SendError<O> = mpsc::SendError<leader::In<O>>;
-
 impl<O: Eq + std::hash::Hash> Scout<O> {
-    pub async fn run(mut self) -> Result<(), mpsc::SendError<leader::In<O>>> {
+    pub async fn run(mut self) -> leader::SendResult<O> {
         'outer: loop {
 
             // Narrowcast P1A to acceptors who haven't responded
@@ -58,7 +56,7 @@ impl<O: Eq + std::hash::Hash> Scout<O> {
         Ok(())
     }
 
-    fn send_p1a(&self) -> Result<(), SendError<O>> {
+    fn send_p1a(&self) -> leader::SendResult<O> {
         let waiting = self.waiting.iter()
             .cloned()
             .collect();
@@ -66,14 +64,14 @@ impl<O: Eq + std::hash::Hash> Scout<O> {
         self.tx.unbounded_send(p1a)
     }
 
-    fn send_adopt(mut self, b_id: message::BallotID) -> Result<(), SendError<O>> {
+    fn send_adopt(mut self, b_id: message::BallotID) -> leader::SendResult<O> {
         let pvalues = self.pvalues.into_iter()
             .collect();
         let adopt = leader::In::Adopt(b_id, pvalues);
         self.tx.unbounded_send(adopt)
     }
 
-    fn send_preempt(self, b_id: message::BallotID) -> Result<(), SendError<O>> {
+    fn send_preempt(self, b_id: message::BallotID) -> leader::SendResult<O> {
         let preempt = leader::In::Preempt::<O>(b_id); 
         self.tx.unbounded_send(preempt)
     }
