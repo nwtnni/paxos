@@ -7,7 +7,7 @@ use crate::constants::COMMANDER_TIMEOUT;
 use crate::message;
 use crate::shared;
 use crate::state;
-use crate::thread::{leader, peer, Tx, Rx};
+use crate::thread::{leader, peer, replica, Tx, Rx};
 
 pub type In = message::P2B;
 
@@ -90,14 +90,13 @@ impl<O: state::Operation> Commander<O> {
     }
 
     fn send_decide(self) {
-        let id = (self.pvalue.b_id, self.pvalue.s_id);
-        let decide = leader::In::Decide(id, message::Proposal {
+        let decide = replica::In::Decide(message::Proposal {
             s_id: self.pvalue.s_id,
             op: self.pvalue.op.clone(),
         });
-        self.leader_tx
-            .unbounded_send(decide)
-            .expect("[INTERNAL ERROR]: failed to send decision");
+        self.shared_tx
+            .read()
+            .send_replica(decide);
     }
 
     fn send_preempt(self, b_id: message::BallotID) {

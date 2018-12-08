@@ -3,7 +3,7 @@ use std::sync::Arc;
 use hashbrown::HashMap as Map;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::thread::{commander, scout, peer, Tx};
+use crate::thread::{commander, peer, replica, scout, Tx};
 
 #[derive(Debug, Clone)]
 pub struct Shared<O>(Arc<RwLock<State<O>>>);
@@ -23,6 +23,7 @@ pub struct State<O> {
     peer_txs: Map<usize, Tx<peer::In<O>>>,
     commander_txs: Map<commander::ID, Tx<commander::In>>,
     scout_tx: Tx<scout::In<O>>,
+    replica_tx: Tx<replica::In<O>>,
 }
 
 impl<O: Clone> State<O> {
@@ -44,6 +45,11 @@ impl<O: Clone> State<O> {
 
     pub fn replace_scout(&mut self, tx: Tx<scout::In<O>>) {
         std::mem::replace(&mut self.scout_tx, tx);
+    }
+
+    pub fn send_replica(&self, message: replica::In<O>) {
+        self.replica_tx.unbounded_send(message)
+            .expect("[INTERNAL ERROR]: failed to send to replica");
     }
 
     pub fn send(&self, id: usize, message: peer::In<O>) {

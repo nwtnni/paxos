@@ -11,6 +11,7 @@ use crate::message;
 use crate::state;
 use crate::thread::*;
 
+#[derive(Debug)]
 pub enum In<O> {
     Propose(message::Proposal<O>),
     Decide(message::Proposal<O>),

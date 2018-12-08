@@ -14,7 +14,6 @@ pub enum In<O> {
     Propose(message::Proposal<O>),
     Preempt(message::BallotID),
     Adopt(Vec<message::PValue<O>>),
-    Decide(commander::ID, message::Proposal<O>),
 }
 
 pub struct Leader<O> {
@@ -22,7 +21,6 @@ pub struct Leader<O> {
     count: usize,
     self_rx: Rx<In<O>>,
     self_tx: Tx<In<O>>,
-    replica_tx: Tx<replica::In<O>>,
     shared_tx: shared::Shared<O>,
     active: bool,
     ballot: message::BallotID,
@@ -38,7 +36,6 @@ impl<O: state::Operation> Leader<O> {
                 | In::Propose(proposal) => self.respond_propose(proposal),
                 | In::Preempt(ballot) => self.respond_preempt(ballot),
                 | In::Adopt(pvalues) => self.respond_adopt(pvalues),
-                | In::Decide(commander, proposal) => self.respond_decide(commander, proposal),
                 }
             }
         }
@@ -81,13 +78,6 @@ impl<O: state::Operation> Leader<O> {
         }
         self.proposals = proposals;
         self.active = true;
-    }
-
-    fn respond_decide(&mut self, commander: commander::ID, proposal: message::Proposal<O>) {
-        let decide = replica::In::Decide(proposal);
-        self.replica_tx
-            .unbounded_send(decide)
-            .expect("[INTERNAL ERROR]: failed to send decision");
     }
 
     fn pmax<I>(pvalues: I) -> impl Iterator<Item = (O, usize)>
