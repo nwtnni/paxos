@@ -58,6 +58,16 @@ impl<O: state::Operation> Leader<O> {
         }
     }
 
+    fn respond_propose(&mut self, proposal: message::Proposal<O>) {
+        if self.proposals.contains_key(&proposal.op) {
+            return
+        }
+        self.proposals.insert(proposal.op.clone(), proposal.s_id);
+        if self.active {
+            self.spawn_commander(proposal);
+        }
+    }
+
     fn respond_scout_preempt(&mut self, ballot: message::BallotID) {
         if ballot < self.ballot { return }
         self.active = false;
@@ -66,11 +76,6 @@ impl<O: state::Operation> Leader<O> {
             l_id: self.id,
         };
         self.spawn_scout();
-    }
-
-    fn respond_commander_preempt(&mut self, commander: commander::ID, ballot: message::BallotID) {
-        self.commander_txs.remove(&commander);
-        self.respond_scout_preempt(ballot);
     }
 
     fn respond_adopt(&mut self, pvalues: Vec<message::PValue<O>>) {
@@ -92,14 +97,9 @@ impl<O: state::Operation> Leader<O> {
         self.active = true;
     }
 
-    fn respond_propose(&mut self, proposal: message::Proposal<O>) {
-        if self.proposals.contains_key(&proposal.op) {
-            return
-        }
-        self.proposals.insert(proposal.op.clone(), proposal.s_id);
-        if self.active {
-            self.spawn_commander(proposal);
-        }
+    fn respond_commander_preempt(&mut self, commander: commander::ID, ballot: message::BallotID) {
+        self.commander_txs.remove(&commander);
+        self.respond_scout_preempt(ballot);
     }
 
     fn respond_decide(&mut self, commander: commander::ID, proposal: message::Proposal<O>) {
