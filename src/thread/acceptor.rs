@@ -1,10 +1,9 @@
 use hashbrown::HashMap as Map;
-use futures::sync::mpsc;
 
 use tokio::prelude::*;
 
 use crate::message;
-use crate::thread::leader;
+use crate::thread::Rx;
 use crate::thread::peer;
 use crate::shared;
 
@@ -19,7 +18,7 @@ pub struct Acceptor<O> {
     id: usize,
     ballot: message::BallotID,
     accepted: Map<usize, message::PValue<O>>,
-    rx: mpsc::UnboundedReceiver<In<O>>,
+    rx: Rx<In<O>>,
     tx: shared::Shared<O>,
 }
 

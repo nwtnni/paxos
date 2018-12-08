@@ -4,13 +4,16 @@ use tokio::prelude::*;
 use tokio::timer;
 
 use crate::message;
+use crate::thread::{Tx, Rx};
 use crate::thread::leader;
 
 pub type In<O> = message::P1B<O>;
 
+pub type SendResult<O> = Result<(), mpsc::SendError<In<O>>>;
+
 pub struct Scout<O> {
-    rx: mpsc::UnboundedReceiver<In<O>>,
-    tx: mpsc::UnboundedSender<leader::In<O>>,
+    rx: Rx<In<O>>,
+    tx: Tx<leader::In<O>>,
     waiting: Set<usize>,
     minority: usize,
     ballot: message::BallotID,

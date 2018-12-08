@@ -5,7 +5,8 @@ use parking_lot::Mutex;
 use futures::sync::mpsc;
 
 use crate::message;
-use crate::thread::peer;
+use crate::thread::{Tx, Rx};
+use crate::thread::{commander, scout};
 use crate::shared;
 
 #[derive(Clone, Debug)]
@@ -23,4 +24,6 @@ pub struct Leader<O> {
     id: usize,
     rx: mpsc::UnboundedReceiver<In<O>>,
     tx: shared::Shared<O>,
+    scout_tx: Option<Tx<scout::In<O>>>,
+    comms_tx: Map<commander::ID, Tx<commander::In>>,
 }
