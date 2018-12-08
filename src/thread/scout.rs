@@ -104,7 +104,7 @@ impl<O: state::Operation> Scout<O> {
     }
 
     fn send_preempt(self, b_id: message::BallotID) {
-        let preempt = leader::In::Preempt::<O>(b_id); 
+        let preempt = leader::In::ScoutPreempt::<O>(b_id); 
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempt");

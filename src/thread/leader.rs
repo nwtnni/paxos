@@ -12,7 +12,8 @@ use crate::state;
 #[derive(Clone, Debug)]
 pub enum In<O> {
     Propose(message::Proposal<O>),
-    Preempt(message::BallotID),
+    CommanderPreempt(commander::ID, message::BallotID),
+    ScoutPreempt(message::BallotID),
     Adopt(Vec<message::PValue<O>>),
     Decide(commander::ID, message::Proposal<O>),
 }
@@ -37,16 +38,27 @@ impl<O: state::Operation> Leader<O> {
         loop {
             while let Some(Ok(message)) = await!(self.self_rx.next()) {
                 match message {
-                | In::Propose(proposal) => self.respond_propose(proposal),
-                | In::Preempt(ballot) => self.respond_preempt(ballot),
-                | In::Adopt(pvalues) => self.respond_adopt(pvalues),
-                | In::Decide(commander, proposal) => self.respond_decide(commander, proposal),
+                | In::Propose(proposal) => {
+                    self.respond_propose(proposal);
+                }
+                | In::ScoutPreempt(ballot) => {
+                    self.respond_scout_preempt(ballot);
+                }
+                | In::Adopt(pvalues) => {
+                    self.respond_adopt(pvalues);
+                }
+                | In::CommanderPreempt(commander, ballot) => {
+                    self.respond_commander_preempt(commander, ballot);
+                }
+                | In::Decide(commander, proposal) => {
+                    self.respond_decide(commander, proposal);
+                }
                 }
             }
         }
     }
 
-    fn respond_preempt(&mut self, ballot: message::BallotID) {
+    fn respond_scout_preempt(&mut self, ballot: message::BallotID) {
         if ballot < self.ballot { return }
         self.active = false;
         self.ballot = message::BallotID {
@@ -54,6 +66,11 @@ impl<O: state::Operation> Leader<O> {
             l_id: self.id,
         };
         self.spawn_scout();
+    }
+
+    fn respond_commander_preempt(&mut self, commander: commander::ID, ballot: message::BallotID) {
+        self.commander_txs.remove(&commander);
+        self.respond_scout_preempt(ballot);
     }
 
     fn respond_adopt(&mut self, pvalues: Vec<message::PValue<O>>) {
