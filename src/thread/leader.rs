@@ -15,7 +15,7 @@ pub enum In<O> {
     Propose(message::Proposal<O>),
     Preempt(message::BallotID),
     Adopt(message::BallotID, Vec<message::PValue<O>>),
-    Decide(message::Proposal<O>),
+    Decide(commander::ID, message::Proposal<O>),
 }
 
 pub struct Leader<O> {
@@ -35,7 +35,30 @@ pub struct Leader<O> {
 
 impl<O: state::Operation> Leader<O> {
     pub async fn run(mut self) {
+        loop {
+            while let Some(Ok(message)) = await!(self.self_rx.next()) {
+                match message {
+                | In::Propose(proposal) => {
 
+                }
+                | In::Preempt(ballot) => {
+
+                }
+                | In::Adopt(ballot, pvalues) => {
+
+                }
+                | In::Decide(commander, proposal) => self.send_decide(commander, proposal),
+                }
+            }
+        }
+    }
+
+    fn send_decide(&mut self, commander: commander::ID, proposal: message::Proposal<O>) {
+        let decide = replica::In::Decide(proposal);
+        self.commander_txs.remove(&commander); 
+        self.replica_tx
+            .unbounded_send(decide)
+            .expect("[INTERNAL ERROR]: failed to send decision");
     }
 
     async fn spawn_commander(&mut self, ballot: message::BallotID, proposal: message::Proposal<O>) {

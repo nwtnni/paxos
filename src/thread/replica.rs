@@ -1,3 +1,6 @@
 use crate::message;
 
-pub type In<O> = message::Proposal<O>;
+pub enum In<O> {
+    Propose(message::Proposal<O>),
+    Decide(message::Proposal<O>),
+}

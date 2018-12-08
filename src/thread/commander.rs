@@ -87,7 +87,8 @@ impl<O: state::Operation> Commander<O> {
     }
 
     fn send_decide(self) {
-        let decide = leader::In::Decide(message::Proposal {
+        let id = (self.pvalue.b_id, self.pvalue.s_id);
+        let decide = leader::In::Decide(id, message::Proposal {
             s_id: self.pvalue.s_id,
             op: self.pvalue.op,
         });
