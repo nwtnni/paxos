@@ -32,7 +32,7 @@ impl<O: Eq + std::hash::Hash> Scout<O> {
             // Respond to incoming P1B messages
             while let Some(Ok(p1b)) = await!(self.rx.next()) {
 
-                // Acceptor has not been preempted
+                // Scout has not been preempted
                 if p1b.b_id == self.ballot {
 
                     // Union known pvalues with acceptor's set
@@ -42,14 +42,15 @@ impl<O: Eq + std::hash::Hash> Scout<O> {
                     // Notify leader that we've achieved a majority
                     if self.waiting.len() <= self.minority {
                         self.send_adopt(p1b.b_id)?;
-                        break 'outer;
+                        break 'outer
                     }
                 }
                 
                 // Notify leader that we've been preempted
-                else if p1b.b_id > self.ballot {
+                else {
+                    debug_assert!(p1b.b_id > self.ballot);
                     self.send_preempt(p1b.b_id)?;
-                    break 'outer;
+                    break 'outer
                 }
             }
         }
@@ -65,15 +66,14 @@ impl<O: Eq + std::hash::Hash> Scout<O> {
         self.tx.unbounded_send(p1a)
     }
 
-    fn send_adopt(&mut self, b_id: message::BallotID) -> Result<(), SendError<O>> {
-        let pvalues = std::mem::replace(&mut self.pvalues, Set::with_capacity(0))
-            .into_iter()
+    fn send_adopt(mut self, b_id: message::BallotID) -> Result<(), SendError<O>> {
+        let pvalues = self.pvalues.into_iter()
             .collect();
         let adopt = leader::In::Adopt(b_id, pvalues);
         self.tx.unbounded_send(adopt)
     }
 
-    fn send_preempt(&self, b_id: message::BallotID) -> Result<(), SendError<O>> {
+    fn send_preempt(self, b_id: message::BallotID) -> Result<(), SendError<O>> {
         let preempt = leader::In::Preempt::<O>(b_id); 
         self.tx.unbounded_send(preempt)
     }
