@@ -1,4 +1,5 @@
-mod acceptor;
-mod commander;
-mod leader;
-mod scout;
+pub(crate) mod acceptor;
+pub(crate) mod commander;
+pub(crate) mod leader;
+pub(crate) mod peer;
+pub(crate) mod scout;
