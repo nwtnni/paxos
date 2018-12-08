@@ -12,8 +12,7 @@ use crate::state;
 #[derive(Clone, Debug)]
 pub enum In<O> {
     Propose(message::Proposal<O>),
-    CommanderPreempt(commander::ID, message::BallotID),
-    ScoutPreempt(message::BallotID),
+    Preempt(message::BallotID),
     Adopt(Vec<message::PValue<O>>),
     Decide(commander::ID, message::Proposal<O>),
 }
@@ -24,9 +23,7 @@ pub struct Leader<O> {
     self_rx: Rx<In<O>>,
     self_tx: Tx<In<O>>,
     replica_tx: Tx<replica::In<O>>,
-    scout_tx: Option<Tx<scout::In<O>>>,
-    commander_txs: Map<commander::ID, Tx<commander::In>>,
-    peer_txs: shared::Shared<O>,
+    shared_tx: shared::Shared<O>,
     active: bool,
     ballot: message::BallotID,
     backoff: time::Duration,
@@ -38,21 +35,10 @@ impl<O: state::Operation> Leader<O> {
         loop {
             while let Some(Ok(message)) = await!(self.self_rx.next()) {
                 match message {
-                | In::Propose(proposal) => {
-                    self.respond_propose(proposal);
-                }
-                | In::ScoutPreempt(ballot) => {
-                    self.respond_scout_preempt(ballot);
-                }
-                | In::Adopt(pvalues) => {
-                    self.respond_adopt(pvalues);
-                }
-                | In::CommanderPreempt(commander, ballot) => {
-                    self.respond_commander_preempt(commander, ballot);
-                }
-                | In::Decide(commander, proposal) => {
-                    self.respond_decide(commander, proposal);
-                }
+                | In::Propose(proposal) => self.respond_propose(proposal),
+                | In::Preempt(ballot) => self.respond_preempt(ballot),
+                | In::Adopt(pvalues) => self.respond_adopt(pvalues),
+                | In::Decide(commander, proposal) => self.respond_decide(commander, proposal),
                 }
             }
         }
@@ -68,7 +54,7 @@ impl<O: state::Operation> Leader<O> {
         }
     }
 
-    fn respond_scout_preempt(&mut self, ballot: message::BallotID) {
+    fn respond_preempt(&mut self, ballot: message::BallotID) {
         if ballot < self.ballot { return }
         self.active = false;
         self.ballot = message::BallotID {
@@ -97,14 +83,8 @@ impl<O: state::Operation> Leader<O> {
         self.active = true;
     }
 
-    fn respond_commander_preempt(&mut self, commander: commander::ID, ballot: message::BallotID) {
-        self.commander_txs.remove(&commander);
-        self.respond_scout_preempt(ballot);
-    }
-
     fn respond_decide(&mut self, commander: commander::ID, proposal: message::Proposal<O>) {
         let decide = replica::In::Decide(proposal);
-        self.commander_txs.remove(&commander);
         self.replica_tx
             .unbounded_send(decide)
             .expect("[INTERNAL ERROR]: failed to send decision");
@@ -132,27 +112,25 @@ impl<O: state::Operation> Leader<O> {
             b_id: self.ballot,
             op: proposal.op,
         };
-        let (commander, commander_tx) = commander::Commander::new(
-            self.self_tx.clone(),
-            self.peer_txs.clone(),
-            pvalue,
-            self.count,
+        let commander = commander::Commander::new(
+                self.self_tx.clone(),
+                self.shared_tx.clone(),
+                pvalue,
+                self.count
         );
-        self.commander_txs.insert(id, commander_tx);
         tokio::spawn_async(async move {
             commander.run();
         })
     }
 
     fn spawn_scout(&mut self) {
-        let (scout, scout_tx) = scout::Scout::new(
+        let scout = scout::Scout::new(
             self.self_tx.clone(),
-            self.peer_txs.clone(),
+            self.shared_tx.clone(),
             self.ballot,
             self.count,
             self.backoff,
         );
-        self.scout_tx = Some(scout_tx);
         tokio::spawn_async(async move {
             scout.run();
         })

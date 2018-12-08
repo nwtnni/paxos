@@ -13,10 +13,11 @@ pub type In = message::P2B;
 
 pub type ID = (message::BallotID, usize);
 
-pub struct Commander<O> {
+pub struct Commander<O: Clone> {
+    id: ID,
     rx: Rx<In>,
     leader_tx: Tx<leader::In<O>>,
-    peer_txs: shared::Shared<O>,
+    shared_tx: shared::Shared<O>,
     waiting: Set<usize>,
     minority: usize,
     pvalue: message::PValue<O>,
@@ -26,24 +27,26 @@ pub struct Commander<O> {
 impl<O: state::Operation> Commander<O> {
     pub fn new(
         leader_tx: Tx<leader::In<O>>,
-        peer_txs: shared::Shared<O>,
+        shared_tx: shared::Shared<O>,
         pvalue: message::PValue<O>,
         count: usize
-    ) -> (Self, Tx<In>) {
+    ) -> Self {
         let waiting = (0..count).collect();
         let minority = (count - 1) / 2;
         let timeout = timer::Interval::new_interval(COMMANDER_TIMEOUT);
         let (self_tx, self_rx) = mpsc::unbounded();
-        let commander = Commander {
+        let id = (pvalue.b_id, pvalue.s_id);
+        shared_tx.write().connect_commander(id, self_tx);
+        Commander {
+            id,
             rx: self_rx,
             leader_tx,
-            peer_txs,
+            shared_tx,
             waiting,
             minority,
             pvalue,
             timeout,
-        };
-        (commander, self_tx)
+        }
     }
 
     pub async fn run(mut self) {
@@ -81,7 +84,7 @@ impl<O: state::Operation> Commander<O> {
 
     fn send_p2a(&self) {
         let p2a = peer::In::P2A(self.pvalue.clone());
-        self.peer_txs
+        self.shared_tx
             .read()
             .narrowcast(&self.waiting, p2a);
     }
@@ -90,7 +93,7 @@ impl<O: state::Operation> Commander<O> {
         let id = (self.pvalue.b_id, self.pvalue.s_id);
         let decide = leader::In::Decide(id, message::Proposal {
             s_id: self.pvalue.s_id,
-            op: self.pvalue.op,
+            op: self.pvalue.op.clone(),
         });
         self.leader_tx
             .unbounded_send(decide)
@@ -98,10 +101,15 @@ impl<O: state::Operation> Commander<O> {
     }
 
     fn send_preempt(self, b_id: message::BallotID) {
-        let id = (self.pvalue.b_id, self.pvalue.s_id);
-        let preempt = leader::In::CommanderPreempt::<O>(id, b_id); 
+        let preempt = leader::In::Preempt::<O>(b_id); 
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempted");
+    }
+}
+
+impl<O: Clone> Drop for Commander<O> {
+    fn drop(&mut self) {
+        self.shared_tx.write().disconnect_commander(self.id);
     }
 }

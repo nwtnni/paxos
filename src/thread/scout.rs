@@ -16,7 +16,7 @@ pub type In<O> = message::P1B<O>;
 pub struct Scout<O> {
     rx: Rx<In<O>>,
     leader_tx: Tx<leader::In<O>>,
-    peer_txs: shared::Shared<O>,
+    shared_tx: shared::Shared<O>,
     waiting: Set<usize>,
     minority: usize,
     ballot: message::BallotID,
@@ -27,11 +27,11 @@ pub struct Scout<O> {
 impl<O: state::Operation> Scout<O> {
     pub fn new(
         leader_tx: Tx<leader::In<O>>,
-        peer_txs: shared::Shared<O>, 
+        shared_tx: shared::Shared<O>, 
         ballot: message::BallotID,
         count: usize,
         delay: time::Duration
-    ) -> (Self, Tx<In<O>>) {
+    ) -> Self {
         let waiting = (0..count).collect();  
         let minority = (count - 1) / 2;
         let timeout = timer::Interval::new(
@@ -40,17 +40,17 @@ impl<O: state::Operation> Scout<O> {
         );
         let pvalues = Set::default();
         let (self_tx, self_rx) = mpsc::unbounded();
-        let scout = Scout {
+        shared_tx.write().replace_scout(self_tx);
+        Scout {
             rx: self_rx,
             leader_tx,
-            peer_txs,
+            shared_tx,
             waiting,
             minority,
             ballot,
             pvalues,
             timeout,
-        };
-        (scout, self_tx)
+        }
     }
 
     pub async fn run(mut self) {
@@ -73,7 +73,7 @@ impl<O: state::Operation> Scout<O> {
 
                     // Notify leader that we've achieved a majority
                     if self.waiting.len() <= self.minority {
-                        self.send_adopt(p1b.b_id);
+                        self.send_adopt();
                         break 'outer
                     }
                 }
@@ -90,12 +90,12 @@ impl<O: state::Operation> Scout<O> {
 
     fn send_p1a(&self) {
         let p1a = peer::In::P1A::<O>(self.ballot);
-        self.peer_txs
+        self.shared_tx
             .read()
             .narrowcast(&self.waiting, p1a);
     }
 
-    fn send_adopt(self, b_id: message::BallotID) {
+    fn send_adopt(self) {
         let pvalues = self.pvalues.into_iter().collect();
         let adopt = leader::In::Adopt(pvalues);
         self.leader_tx
@@ -104,7 +104,7 @@ impl<O: state::Operation> Scout<O> {
     }
 
     fn send_preempt(self, b_id: message::BallotID) {
-        let preempt = leader::In::ScoutPreempt::<O>(b_id); 
+        let preempt = leader::In::Preempt::<O>(b_id); 
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempt");
