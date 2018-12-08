@@ -38,14 +38,22 @@ impl<O: state::Operation> Leader<O> {
             while let Some(Ok(message)) = await!(self.self_rx.next()) {
                 match message {
                 | In::Propose(proposal) => self.respond_propose(proposal),
-                | In::Preempt(ballot) => {
-
-                }
+                | In::Preempt(ballot) => self.respond_preempt(ballot),
                 | In::Adopt(pvalues) => self.respond_adopt(pvalues),
                 | In::Decide(commander, proposal) => self.respond_decide(commander, proposal),
                 }
             }
         }
+    }
+
+    fn respond_preempt(&mut self, ballot: message::BallotID) {
+        if ballot < self.ballot { return }
+        self.active = false;
+        self.ballot = message::BallotID {
+            b_id: ballot.b_id + 1,
+            l_id: self.id,
+        };
+        self.spawn_scout();
     }
 
     fn respond_adopt(&mut self, pvalues: Vec<message::PValue<O>>) {
@@ -87,7 +95,7 @@ impl<O: state::Operation> Leader<O> {
 
     fn pmax<I>(pvalues: I) -> impl Iterator<Item = (O, usize)>
         where I: IntoIterator<Item = message::PValue<O>> {
-        let mut pmax: Map<usize, (message::BallotID, O)> = Map::default(); 
+        let mut pmax: Map<usize, (message::BallotID, O)> = Map::default();
         for pvalue in pvalues.into_iter() {
             pmax.entry(pvalue.s_id)
                 .and_modify(|(b_id, op)| {
