@@ -5,6 +5,7 @@ use tokio::timer;
 
 use crate::constants::COMMANDER_TIMEOUT;
 use crate::message;
+use crate::state;
 use crate::thread::{Tx, Rx};
 use crate::thread::leader;
 
@@ -23,7 +24,7 @@ pub struct Commander<O> {
     timeout: timer::Interval,
 }
 
-impl<O: Clone> Commander<O> {
+impl<O: state::Operation> Commander<O> {
     pub fn new(tx: Tx<leader::In<O>>, pvalue: message::PValue<O>, count: usize) -> (Self, Tx<In>) {
         let waiting = (0..count).collect();
         let minority = (count - 1) / 2;

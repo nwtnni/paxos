@@ -1,3 +1,5 @@
+use std::time;
+
 use hashbrown::HashSet as Set;
 use futures::sync::mpsc;
 use tokio::prelude::*;
@@ -5,6 +7,7 @@ use tokio::timer;
 
 use crate::constants::SCOUT_TIMEOUT;
 use crate::message;
+use crate::state;
 use crate::thread::{Tx, Rx};
 use crate::thread::leader;
 
@@ -22,11 +25,14 @@ pub struct Scout<O> {
     timeout: timer::Interval,
 }
 
-impl<O: Eq + std::hash::Hash> Scout<O> {
-    pub fn new(tx: Tx<leader::In<O>>, ballot: message::BallotID, count: usize) -> (Self, Tx<In<O>>) {
+impl<O: state::Operation> Scout<O> {
+    pub fn new(tx: Tx<leader::In<O>>, ballot: message::BallotID, count: usize, delay: time::Duration) -> (Self, Tx<In<O>>) {
         let waiting = (0..count).collect();  
         let minority = (count - 1) / 2;
-        let timeout = timer::Interval::new_interval(SCOUT_TIMEOUT);
+        let timeout = timer::Interval::new(
+            time::Instant::now() + delay,
+            SCOUT_TIMEOUT
+        );
         let pvalues = Set::default();
         let (self_tx, self_rx) = mpsc::unbounded();
         let scout = Scout {

@@ -6,6 +6,7 @@ use crate::message;
 use crate::thread::Rx;
 use crate::thread::peer;
 use crate::shared;
+use crate::state;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum In<O> {
@@ -22,7 +23,7 @@ pub struct Acceptor<O> {
     tx: shared::Shared<O>,
 }
 
-impl<O: Clone + Eq + std::hash::Hash> Acceptor<O> {
+impl<O: state::Operation> Acceptor<O> {
     pub async fn run(mut self) -> peer::SendResult<O> {
         loop {
             while let Some(Ok(message)) = await!(self.rx.next()) {

@@ -8,6 +8,7 @@ pub trait Operation: std::fmt::Debug
     + PartialEq
     + Send
     + Sync
+    + 'static
 {
 }
 

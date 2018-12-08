@@ -1,13 +1,14 @@
 use std::time;
 
 use hashbrown::HashMap as Map;
-use parking_lot::Mutex;
 use futures::sync::mpsc;
+use tokio::prelude::*;
 
 use crate::message;
 use crate::thread::{Tx, Rx};
 use crate::thread::{commander, replica, scout};
 use crate::shared;
+use crate::state;
 
 #[derive(Clone, Debug)]
 pub enum In<O> {
@@ -23,20 +24,48 @@ pub type SendResult<O> = Result<(), mpsc::SendError<In<O>>>;
 
 pub struct Leader<O> {
     id: usize,
-    rx: Rx<In<O>>,
-    tx: shared::Shared<O>,
+    count: usize,
+    self_rx: Rx<In<O>>,
+    self_tx: Tx<In<O>>,
     replica_tx: Tx<replica::In<O>>,
     scout_tx: Option<Tx<scout::In<O>>>,
-    comms_tx: Map<commander::ID, Tx<commander::In>>,
+    commander_txs: Map<commander::ID, Tx<commander::In>>,
+    peer_txs: shared::Shared<O>,
     active: bool,
     ballot: message::BallotID,
     backoff: time::Duration,
-    proposals: Map<usize, O>,
+    proposals: Map<usize, message::Proposal<O>>,
 }
 
-impl<O> Leader<O> {
+impl<O: state::Operation> Leader<O> {
     pub async fn run(mut self) {
 
+    }
 
+    async fn spawn_commander(&mut self, ballot: message::BallotID, proposal: message::Proposal<O>) {
+        let id = (ballot, proposal.s_id);
+        let pvalue = message::PValue {
+            s_id: proposal.s_id, 
+            b_id: ballot,
+            op: proposal.op,
+        };
+        let (commander, commander_tx) = commander::Commander::new(
+            self.self_tx.clone(),
+            pvalue,
+            self.count,
+        );
+        self.commander_txs.insert(id, commander_tx);
+        await!(commander.run());
+    }
+
+    async fn spawn_scout(&mut self) {
+        let (scout, scout_tx) = scout::Scout::new(
+            self.self_tx.clone(),
+            self.ballot,
+            self.count,
+            self.backoff,
+        );
+        self.scout_tx = Some(scout_tx);
+        await!(scout.run());
     }
 }
