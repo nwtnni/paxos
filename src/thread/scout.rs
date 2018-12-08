@@ -97,7 +97,7 @@ impl<O: state::Operation> Scout<O> {
 
     fn send_adopt(self, b_id: message::BallotID) {
         let pvalues = self.pvalues.into_iter().collect();
-        let adopt = leader::In::Adopt(b_id, pvalues);
+        let adopt = leader::In::Adopt(pvalues);
         self.leader_tx
             .unbounded_send(adopt)
             .expect("[INTERNAL ERROR]: failed to send adopt");

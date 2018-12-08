@@ -1,7 +1,6 @@
 use std::time;
 
 use hashbrown::HashMap as Map;
-use futures::sync::mpsc;
 use tokio::prelude::*;
 
 use crate::message;
@@ -14,7 +13,7 @@ use crate::state;
 pub enum In<O> {
     Propose(message::Proposal<O>),
     Preempt(message::BallotID),
-    Adopt(message::BallotID, Vec<message::PValue<O>>),
+    Adopt(Vec<message::PValue<O>>),
     Decide(commander::ID, message::Proposal<O>),
 }
 
@@ -30,7 +29,7 @@ pub struct Leader<O> {
     active: bool,
     ballot: message::BallotID,
     backoff: time::Duration,
-    proposals: Map<usize, message::Proposal<O>>,
+    proposals: Map<O, usize>,
 }
 
 impl<O: state::Operation> Leader<O> {
@@ -38,34 +37,74 @@ impl<O: state::Operation> Leader<O> {
         loop {
             while let Some(Ok(message)) = await!(self.self_rx.next()) {
                 match message {
-                | In::Propose(proposal) => {
-
-                }
+                | In::Propose(proposal) => self.respond_propose(proposal),
                 | In::Preempt(ballot) => {
 
                 }
-                | In::Adopt(ballot, pvalues) => {
-
-                }
-                | In::Decide(commander, proposal) => self.send_decide(commander, proposal),
+                | In::Adopt(pvalues) => self.respond_adopt(pvalues),
+                | In::Decide(commander, proposal) => self.respond_decide(commander, proposal),
                 }
             }
         }
     }
 
-    fn send_decide(&mut self, commander: commander::ID, proposal: message::Proposal<O>) {
+    fn respond_adopt(&mut self, pvalues: Vec<message::PValue<O>>) {
+        for (op, s_id) in Self::pmax(pvalues) {
+            self.proposals.insert(op, s_id);
+        }
+        let proposals = std::mem::replace(
+            &mut self.proposals,
+            Map::with_capacity(0)
+        );
+        for (op, s_id) in &proposals {
+            let proposal = message::Proposal {
+                s_id: s_id.clone(),
+                op: op.clone(),
+            };
+            self.spawn_commander(proposal);
+        }
+        self.proposals = proposals;
+        self.active = true;
+    }
+
+    fn respond_propose(&mut self, proposal: message::Proposal<O>) {
+        if self.proposals.contains_key(&proposal.op) {
+            return
+        }
+        self.proposals.insert(proposal.op.clone(), proposal.s_id);
+        if self.active {
+            self.spawn_commander(proposal);
+        }
+    }
+
+    fn respond_decide(&mut self, commander: commander::ID, proposal: message::Proposal<O>) {
         let decide = replica::In::Decide(proposal);
-        self.commander_txs.remove(&commander); 
+        self.commander_txs.remove(&commander);
         self.replica_tx
             .unbounded_send(decide)
             .expect("[INTERNAL ERROR]: failed to send decision");
     }
 
-    async fn spawn_commander(&mut self, ballot: message::BallotID, proposal: message::Proposal<O>) {
-        let id = (ballot, proposal.s_id);
+    fn pmax<I>(pvalues: I) -> impl Iterator<Item = (O, usize)>
+        where I: IntoIterator<Item = message::PValue<O>> {
+        let mut pmax: Map<usize, (message::BallotID, O)> = Map::default(); 
+        for pvalue in pvalues.into_iter() {
+            pmax.entry(pvalue.s_id)
+                .and_modify(|(b_id, op)| {
+                    if pvalue.b_id > *b_id {
+                        *b_id = pvalue.b_id;
+                        *op = pvalue.op;
+                    }
+                });
+        }
+        pmax.into_iter().map(|(s_id, (_, op))| (op, s_id))
+    }
+
+    fn spawn_commander(&mut self, proposal: message::Proposal<O>) {
+        let id = (self.ballot, proposal.s_id);
         let pvalue = message::PValue {
-            s_id: proposal.s_id, 
-            b_id: ballot,
+            s_id: proposal.s_id,
+            b_id: self.ballot,
             op: proposal.op,
         };
         let (commander, commander_tx) = commander::Commander::new(
@@ -75,10 +114,12 @@ impl<O: state::Operation> Leader<O> {
             self.count,
         );
         self.commander_txs.insert(id, commander_tx);
-        await!(commander.run());
+        tokio::spawn_async(async move {
+            commander.run();
+        })
     }
 
-    async fn spawn_scout(&mut self) {
+    fn spawn_scout(&mut self) {
         let (scout, scout_tx) = scout::Scout::new(
             self.self_tx.clone(),
             self.peer_txs.clone(),
@@ -87,6 +128,8 @@ impl<O: state::Operation> Leader<O> {
             self.backoff,
         );
         self.scout_tx = Some(scout_tx);
-        await!(scout.run());
+        tokio::spawn_async(async move {
+            scout.run();
+        })
     }
 }

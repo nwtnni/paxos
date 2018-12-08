@@ -1,7 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BallotID {
     pub b_id: usize,
     pub l_id: usize,
