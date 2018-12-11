@@ -42,10 +42,10 @@ impl<O: state::Operation> Leader<O> {
     }
 
     fn respond_propose(&mut self, proposal: message::Proposal<O>) {
-        if self.proposals.contains_key(&proposal.op) {
+        if self.proposals.contains_key(&proposal.c_id) {
             return
         }
-        self.proposals.insert(proposal.op.clone(), proposal.s_id);
+        self.proposals.insert(proposal.c_id.clone(), proposal.s_id);
         if self.active {
             self.spawn_commander(proposal);
         }
@@ -69,10 +69,10 @@ impl<O: state::Operation> Leader<O> {
             &mut self.proposals,
             Map::with_capacity(0)
         );
-        for (op, s_id) in &proposals {
+        for (c_id, s_id) in &proposals {
             let proposal = message::Proposal {
                 s_id: s_id.clone(),
-                op: op.clone(),
+                c_id: c_id.clone(),
             };
             self.spawn_commander(proposal);
         }
@@ -85,10 +85,10 @@ impl<O: state::Operation> Leader<O> {
         let mut pmax: Map<usize, (message::BallotID, O)> = Map::default();
         for pvalue in pvalues.into_iter() {
             pmax.entry(pvalue.s_id)
-                .and_modify(|(b_id, op)| {
+                .and_modify(|(b_id, c_id)| {
                     if pvalue.b_id > *b_id {
                         *b_id = pvalue.b_id;
-                        *op = pvalue.op;
+                        *c_id = pvalue.c_id;
                     }
                 });
         }
@@ -100,7 +100,7 @@ impl<O: state::Operation> Leader<O> {
         let pvalue = message::PValue {
             s_id: proposal.s_id,
             b_id: self.ballot,
-            op: proposal.op,
+            c_id: proposal.c_id,
         };
         let commander = commander::Commander::new(
                 self.self_tx.clone(),

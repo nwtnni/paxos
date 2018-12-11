@@ -92,7 +92,7 @@ impl<O: state::Operation> Commander<O> {
     fn send_decide(self) {
         let decide = message::Proposal {
             s_id: self.pvalue.s_id,
-            op: self.pvalue.op.clone(),
+            c_id: self.pvalue.c_id.clone(),
         };
         self.shared_tx
             .read()

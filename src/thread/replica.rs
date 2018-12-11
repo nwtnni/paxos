@@ -33,19 +33,19 @@ impl<O: state::Operation + marker::Unpin, R: state::Response, S: state::State<O,
         }
     }
 
-    fn propose(&mut self, op: O) {
-        if self.decisions.contains_key(&op) { return }
+    fn propose(&mut self, c_id: O) {
+        if self.decisions.contains_key(&c_id) { return }
 
         let next = 1 + std::cmp::max(
             self.proposals.values().max().unwrap_or(&0),
             self.decisions.values().max().unwrap_or(&0),
         );
 
-        self.proposals.insert(op.clone(), next);
+        self.proposals.insert(c_id.clone(), next);
 
         let proposal = leader::In::Propose(message::Proposal {
             s_id: next,
-            op: op,
+            c_id: c_id,
         });
 
         self.leader_tx.unbounded_send(proposal)
