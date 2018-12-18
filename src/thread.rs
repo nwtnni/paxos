@@ -21,4 +21,4 @@ type ReadTcp = io::ReadHalf<net::TcpStream>;
 type WriteTcp = io::WriteHalf<net::TcpStream>;
 
 pub type SocketRx<T> = RB<stream::FromErr<FramedRead<ReadTcp, LengthDelimitedCodec>, bincode::Error>, T>;
-pub type SocketTx<T> = WB<sink::SinkFromErr<FramedWrite<WriteTcp, LengthDelimitedCodec>, bincode::Error>, T>;
+pub type SocketTx = sink::SinkFromErr<FramedWrite<WriteTcp, LengthDelimitedCodec>, bincode::Error>;
