@@ -1,5 +1,6 @@
 pub trait Identifier: std::fmt::Debug
     + std::hash::Hash
+    + std::marker::Unpin
     + serde::Serialize
     + serde::de::DeserializeOwned
     + Clone

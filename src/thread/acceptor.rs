@@ -4,14 +4,14 @@ use tokio::prelude::*;
 
 use crate::message;
 use crate::thread::Rx;
-use crate::thread::peer;
+use crate::thread::{commander, peer};
 use crate::shared;
 use crate::state;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum In<I> {
     P1A(message::P1A),
-    P2A(message::P2A<I>),
+    P2A(commander::ID, message::P2A<I>),
 }
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ impl<I: state::Identifier> Acceptor<I> {
             while let Some(Ok(message)) = await!(self.rx.next()) {
                 match message {
                 | In::P1A(m) => self.send_p1a(m),
-                | In::P2A(m) => self.send_p2a(m),
+                | In::P2A(c_id, m) => self.send_p2a(c_id, m),
                 }
             }
         }
@@ -47,15 +47,18 @@ impl<I: state::Identifier> Acceptor<I> {
         self.tx.read().send(ballot.l_id, p1b)
     }
 
-    fn send_p2a(&mut self, pvalue: message::P2A<I>) {
+    fn send_p2a(&mut self, c_id: commander::ID, pvalue: message::P2A<I>) {
         if pvalue.b_id >= self.ballot {
             self.ballot = pvalue.b_id;
             self.accepted.insert(pvalue.s_id, pvalue.clone());
         }
-        let p2b = peer::In::P2B(message::P2B {
-            a_id: self.id,
-            b_id: self.ballot,
-        });
+        let p2b = peer::In::P2B(
+            c_id,
+            message::P2B {
+                a_id: self.id,
+                b_id: self.ballot,
+            }
+        );
         self.tx.read().send(pvalue.b_id.l_id, p2b)
     }
 }

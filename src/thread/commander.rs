@@ -83,7 +83,10 @@ impl<I: state::Identifier> Commander<I> {
     }
 
     fn send_p2a(&self) {
-        let p2a = peer::In::P2A(self.pvalue.clone());
+        let p2a = peer::In::P2A(
+            self.id,
+            self.pvalue.clone()
+        );
         self.shared_tx
             .read()
             .narrowcast(&self.waiting, p2a);
