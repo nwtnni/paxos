@@ -10,25 +10,25 @@ use crate::shared;
 use crate::state;
 
 #[derive(Clone, Debug)]
-pub enum In<O> {
-    Propose(message::Proposal<O>),
+pub enum In<I> {
+    Propose(message::Proposal<I>),
     Preempt(message::BallotID),
-    Adopt(Vec<message::PValue<O>>),
+    Adopt(Vec<message::PValue<I>>),
 }
 
-pub struct Leader<O> {
+pub struct Leader<I> {
     id: usize,
     count: usize,
-    self_rx: Rx<In<O>>,
-    self_tx: Tx<In<O>>,
-    shared_tx: shared::Shared<O>,
+    self_rx: Rx<In<I>>,
+    self_tx: Tx<In<I>>,
+    shared_tx: shared::Shared<I>,
     active: bool,
     ballot: message::BallotID,
     backoff: time::Duration,
-    proposals: Map<O, usize>,
+    proposals: Map<I, usize>,
 }
 
-impl<O: state::Operation> Leader<O> {
+impl<I: state::Identifier> Leader<I> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.self_rx.next()) {
@@ -41,7 +41,7 @@ impl<O: state::Operation> Leader<O> {
         }
     }
 
-    fn respond_propose(&mut self, proposal: message::Proposal<O>) {
+    fn respond_propose(&mut self, proposal: message::Proposal<I>) {
         if self.proposals.contains_key(&proposal.c_id) {
             return
         }
@@ -61,7 +61,7 @@ impl<O: state::Operation> Leader<O> {
         self.spawn_scout();
     }
 
-    fn respond_adopt(&mut self, pvalues: Vec<message::PValue<O>>) {
+    fn respond_adopt(&mut self, pvalues: Vec<message::PValue<I>>) {
         for (op, s_id) in Self::pmax(pvalues) {
             self.proposals.insert(op, s_id);
         }
@@ -80,9 +80,9 @@ impl<O: state::Operation> Leader<O> {
         self.active = true;
     }
 
-    fn pmax<I>(pvalues: I) -> impl Iterator<Item = (O, usize)>
-        where I: IntoIterator<Item = message::PValue<O>> {
-        let mut pmax: Map<usize, (message::BallotID, O)> = Map::default();
+    fn pmax<T>(pvalues: T) -> impl Iterator<Item = (I, usize)>
+        where T: IntoIterator<Item = message::PValue<I>> {
+        let mut pmax: Map<usize, (message::BallotID, I)> = Map::default();
         for pvalue in pvalues.into_iter() {
             pmax.entry(pvalue.s_id)
                 .and_modify(|(b_id, c_id)| {
@@ -95,7 +95,7 @@ impl<O: state::Operation> Leader<O> {
         pmax.into_iter().map(|(s_id, (_, op))| (op, s_id))
     }
 
-    fn spawn_commander(&mut self, proposal: message::Proposal<O>) {
+    fn spawn_commander(&mut self, proposal: message::Proposal<I>) {
         let id = (self.ballot, proposal.s_id);
         let pvalue = message::PValue {
             s_id: proposal.s_id,

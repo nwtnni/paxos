@@ -9,21 +9,21 @@ use crate::shared;
 use crate::state;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum In<O> {
+pub enum In<I> {
     P1A(message::P1A),
-    P2A(message::P2A<O>),
+    P2A(message::P2A<I>),
 }
 
 #[derive(Debug)]
-pub struct Acceptor<O> {
+pub struct Acceptor<I> {
     id: usize,
     ballot: message::BallotID,
-    accepted: Map<usize, message::PValue<O>>,
-    rx: Rx<In<O>>,
-    tx: shared::Shared<O>,
+    accepted: Map<usize, message::PValue<I>>,
+    rx: Rx<In<I>>,
+    tx: shared::Shared<I>,
 }
 
-impl<O: state::Operation> Acceptor<O> {
+impl<I: state::Identifier> Acceptor<I> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.rx.next()) {
@@ -47,7 +47,7 @@ impl<O: state::Operation> Acceptor<O> {
         self.tx.read().send(ballot.l_id, p1b)
     }
 
-    fn send_p2a(&mut self, pvalue: message::P2A<O>) {
+    fn send_p2a(&mut self, pvalue: message::P2A<I>) {
         if pvalue.b_id >= self.ballot {
             self.ballot = pvalue.b_id;
             self.accepted.insert(pvalue.s_id, pvalue.clone());

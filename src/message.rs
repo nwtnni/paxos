@@ -9,29 +9,29 @@ pub struct BallotID {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Ballot<C> {
+pub struct Ballot<I> {
     pub b_id: BallotID,
-    pub c_id: C,
+    pub c_id: I,
 }
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PValue<C> {
+pub struct PValue<I> {
     pub s_id: usize,
     pub b_id: BallotID,
-    pub c_id: C,
+    pub c_id: I,
 }
 
 pub type P1A = BallotID;
 
-pub type P2A<C> = PValue<C>;
+pub type P2A<I> = PValue<I>;
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct P1B<C> {
+pub struct P1B<I> {
     pub a_id: usize,
     pub b_id: BallotID,
-    pub pvalues: Vec<PValue<C>>,
+    pub pvalues: Vec<PValue<I>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -43,7 +43,7 @@ pub struct P2B {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Proposal<C> {
+pub struct Proposal<I> {
     pub s_id: usize,
-    pub c_id: C,
+    pub c_id: I,
 }

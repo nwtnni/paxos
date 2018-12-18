@@ -11,23 +11,23 @@ use crate::shared;
 use crate::state;
 use crate::thread::{leader, peer, Tx, Rx};
 
-pub type In<O> = message::P1B<O>;
+pub type In<I> = message::P1B<I>;
 
-pub struct Scout<O> {
-    rx: Rx<In<O>>,
-    leader_tx: Tx<leader::In<O>>,
-    shared_tx: shared::Shared<O>,
+pub struct Scout<I> {
+    rx: Rx<In<I>>,
+    leader_tx: Tx<leader::In<I>>,
+    shared_tx: shared::Shared<I>,
     waiting: Set<usize>,
     minority: usize,
     ballot: message::BallotID,
-    pvalues: Set<message::PValue<O>>,
+    pvalues: Set<message::PValue<I>>,
     timeout: timer::Interval,
 }
 
-impl<O: state::Operation> Scout<O> {
+impl<I: state::Identifier> Scout<I> {
     pub fn new(
-        leader_tx: Tx<leader::In<O>>,
-        shared_tx: shared::Shared<O>, 
+        leader_tx: Tx<leader::In<I>>,
+        shared_tx: shared::Shared<I>, 
         ballot: message::BallotID,
         count: usize,
         delay: time::Duration
@@ -89,7 +89,7 @@ impl<O: state::Operation> Scout<O> {
     }
 
     fn send_p1a(&self) {
-        let p1a = peer::In::P1A::<O>(self.ballot);
+        let p1a = peer::In::P1A::<I>(self.ballot);
         self.shared_tx
             .read()
             .narrowcast(&self.waiting, p1a);
@@ -104,7 +104,7 @@ impl<O: state::Operation> Scout<O> {
     }
 
     fn send_preempt(self, b_id: message::BallotID) {
-        let preempt = leader::In::Preempt::<O>(b_id); 
+        let preempt = leader::In::Preempt::<I>(b_id); 
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempt");

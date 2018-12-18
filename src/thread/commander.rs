@@ -13,22 +13,22 @@ pub type In = message::P2B;
 
 pub type ID = (message::BallotID, usize);
 
-pub struct Commander<O: Clone> {
+pub struct Commander<I: Clone> {
     id: ID,
     rx: Rx<In>,
-    leader_tx: Tx<leader::In<O>>,
-    shared_tx: shared::Shared<O>,
+    leader_tx: Tx<leader::In<I>>,
+    shared_tx: shared::Shared<I>,
     waiting: Set<usize>,
     minority: usize,
-    pvalue: message::PValue<O>,
+    pvalue: message::PValue<I>,
     timeout: timer::Interval,
 }
 
-impl<O: state::Operation> Commander<O> {
+impl<I: state::Identifier> Commander<I> {
     pub fn new(
-        leader_tx: Tx<leader::In<O>>,
-        shared_tx: shared::Shared<O>,
-        pvalue: message::PValue<O>,
+        leader_tx: Tx<leader::In<I>>,
+        shared_tx: shared::Shared<I>,
+        pvalue: message::PValue<I>,
         count: usize
     ) -> Self {
         let waiting = (0..count).collect();
@@ -100,14 +100,14 @@ impl<O: state::Operation> Commander<O> {
     }
 
     fn send_preempt(self, b_id: message::BallotID) {
-        let preempt = leader::In::Preempt::<O>(b_id); 
+        let preempt = leader::In::Preempt::<I>(b_id); 
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempted");
     }
 }
 
-impl<O: Clone> Drop for Commander<O> {
+impl<I: Clone> Drop for Commander<I> {
     fn drop(&mut self) {
         self.shared_tx.write().disconnect_commander(self.id);
     }
