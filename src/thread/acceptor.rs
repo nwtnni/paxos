@@ -24,6 +24,17 @@ pub struct Acceptor<I> {
 }
 
 impl<I: state::Identifier> Acceptor<I> {
+
+    pub fn new(id: usize, rx: Rx<In<I>>, tx: shared::Shared<I>) -> Self {
+        Acceptor {
+            id, 
+            ballot: message::BallotID::default(),
+            accepted: Map::default(),
+            rx,
+            tx
+        }
+    }
+
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.rx.next()) {
