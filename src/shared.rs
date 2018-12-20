@@ -26,7 +26,7 @@ pub struct State<I> {
     replica_tx: Tx<replica::In<I>>,
 }
 
-impl<I: Clone> State<I> {
+impl<I> State<I> {
     pub fn connect_peer(&mut self, id: usize, tx: Tx<peer::In<I>>) {
         self.peer_txs.insert(id, tx);
     }
@@ -69,7 +69,9 @@ impl<I: Clone> State<I> {
             let _ = tx.unbounded_send(message);
         }
     }
+}
 
+impl<I: Clone> State<I> {
     pub fn broadcast(&self, message: peer::In<I>) {
         for id in self.peer_txs.keys() {
             self.send(*id, message.clone());

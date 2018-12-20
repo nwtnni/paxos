@@ -1,3 +1,4 @@
+use futures::sync::mpsc;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 use tokio_serde_bincode::WriteBincode;
@@ -14,15 +15,76 @@ pub enum In<I> {
     P1B(message::P1B<I>),
     P2A(commander::ID, message::P2A<I>),
     P2B(commander::ID, message::P2B),
-    Ping,
+    Ping(usize),
+}
+
+pub struct Connecting<I> {
+    self_id: usize,
+    peer_rx: SocketRx<In<I>>,
+    peer_tx: SocketTx,
+    acceptor_tx: Tx<acceptor::In<I>>,
+    shared_tx: Shared<I>,
+}
+
+impl<I: state::Identifier> Connecting<I> {
+
+    pub fn new(
+        self_id: usize,
+        peer_rx: SocketRx<In<I>>,
+        peer_tx: SocketTx,
+        acceptor_tx: Tx<acceptor::In<I>>,
+        shared_tx: Shared<I>,
+    ) -> Self {
+        Connecting {
+            self_id,
+            peer_rx,
+            peer_tx,
+            acceptor_tx,
+            shared_tx,
+        }
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            while let Some(Ok(message)) = await!(self.peer_rx.next()) {
+                match message {
+                | In::Ping(peer_id) => {
+                    let (tx, rx) = mpsc::unbounded();
+                    self.shared_tx.write().connect_peer(peer_id, tx);
+                    let peer = Peer {
+                        self_id: self.self_id,
+                        peer_id,
+                        rx,
+                        peer_rx: self.peer_rx,
+                        peer_tx: self.peer_tx,
+                        acceptor_tx: self.acceptor_tx,
+                        shared_tx: self.shared_tx,
+                        ping: tokio::timer::Interval::new_interval(
+                            std::time::Duration::from_millis(500)
+                        ),
+                    };
+                    
+                    tokio::spawn_async(async {
+                        peer.run();
+                    });
+
+                    return
+                }
+                | _ => (),
+                }
+            }
+        }
+    }
 }
 
 pub struct Peer<I> {
+    peer_id: usize,
+    self_id: usize,
     rx: Rx<In<I>>,
     peer_rx: SocketRx<In<I>>,
     peer_tx: SocketTx,
     acceptor_tx: Tx<acceptor::In<I>>,
-    shared: Shared<I>,
+    shared_tx: Shared<I>,
     ping: tokio::timer::Interval,
 }
 
@@ -32,7 +94,7 @@ impl<I: state::Identifier> Peer<I> {
         loop {
             // Drop connection to unresponsive peers
             while let Some(_) = await!(self.ping.next()) {
-                if let Err(_) = self.send(In::Ping) {
+                if let Err(_) = self.send(In::Ping(self.self_id)) {
                     return
                 }
             }
@@ -62,12 +124,12 @@ impl<I: state::Identifier> Peer<I> {
                 .expect("[INTERNAL ERROR]: failed to send to acceptor");
         }
         | In::P1B(p1b) => {
-            self.shared.read().send_scout(p1b);
+            self.shared_tx.read().send_scout(p1b);
         }
         | In::P2B(c_id, p2b) => {
-            self.shared.read().send_commander(c_id, p2b);
+            self.shared_tx.read().send_commander(c_id, p2b);
         }
-        | In::Ping => (),
+        | In::Ping(_) => (),
         }
     }
 
@@ -77,5 +139,11 @@ impl<I: state::Identifier> Peer<I> {
             .wait()
             .map(|_| ())
             .map_err(|_| ())
+    }
+}
+
+impl<I> Drop for Peer<I> {
+    fn drop(&mut self) {
+        self.shared_tx.write().disconnect_peer(self.peer_id);
     }
 }
