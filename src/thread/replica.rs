@@ -2,11 +2,13 @@ use std::marker;
 use std::collections::HashMap as Map;
 
 use bimap::BiMap;
+use futures::sync::mpsc;
 use tokio::prelude::*;
-use tokio_serde_bincode::WriteBincode;
-use tokio::codec;
+use tokio_serde_bincode::{ReadBincode, WriteBincode};
+use tokio::{codec, net};
 
 use crate::message;
+use crate::shared;
 use crate::state;
 use crate::thread::*;
 
@@ -26,6 +28,39 @@ pub struct Replica<C: state::Command, R, S> {
 }
 
 impl<C: state::Command, R: state::Response, S: state::State<C, R>> Replica<C, R, S> {
+    pub fn new(
+        client: net::tcp::TcpStream,   
+        leader_tx: Tx<leader::In<C::ID>>,
+        shared_tx: shared::Shared<C::ID>,
+        rx: Rx<In<C::ID>>,
+        state: S,
+    ) -> Self {
+        let (client_rx, client_tx) = client.split();
+
+        let client_rx = ReadBincode::new(
+            codec::length_delimited::Builder::new()
+                .new_read(client_rx)
+                .from_err::<bincode::Error>()
+        );
+
+        let client_tx = codec::length_delimited::Builder::new()
+            .new_write(client_tx)
+            .sink_from_err::<bincode::Error>();
+
+        Replica {
+            client_rx,
+            client_tx,
+            leader_tx,
+            rx,
+            state,
+            slot: 0,
+            proposals: BiMap::default(),
+            decisions: BiMap::default(),
+            commands: Map::default(),
+            _marker: Default::default(),
+        }
+    }
+
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(request)) = await!(self.client_rx.next()) {
