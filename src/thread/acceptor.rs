@@ -20,18 +20,18 @@ pub struct Acceptor<I> {
     ballot: message::BallotID,
     accepted: Map<usize, message::PValue<I>>,
     rx: Rx<In<I>>,
-    tx: shared::Shared<I>,
+    shared_tx: shared::Shared<I>,
 }
 
 impl<I: state::Identifier> Acceptor<I> {
 
-    pub fn new(id: usize, rx: Rx<In<I>>, tx: shared::Shared<I>) -> Self {
+    pub fn new(id: usize, rx: Rx<In<I>>, shared_tx: shared::Shared<I>) -> Self {
         Acceptor {
             id, 
             ballot: message::BallotID::default(),
             accepted: Map::default(),
             rx,
-            tx
+            shared_tx
         }
     }
 
@@ -55,7 +55,7 @@ impl<I: state::Identifier> Acceptor<I> {
                 .cloned()
                 .collect(),
         });
-        self.tx.read().send(ballot.l_id, p1b)
+        self.shared_tx.read().send(ballot.l_id, p1b)
     }
 
     fn send_p2a(&mut self, c_id: commander::ID, pvalue: message::P2A<I>) {
@@ -70,6 +70,6 @@ impl<I: state::Identifier> Acceptor<I> {
                 b_id: self.ballot,
             }
         );
-        self.tx.read().send(pvalue.b_id.l_id, p2b)
+        self.shared_tx.read().send(pvalue.b_id.l_id, p2b)
     }
 }

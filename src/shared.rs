@@ -9,6 +9,10 @@ use crate::thread::{commander, peer, replica, scout, Tx};
 pub struct Shared<I>(Arc<RwLock<State<I>>>);
 
 impl<I> Shared<I> {
+    pub fn new(scout_tx: Tx<scout::In<I>>, replica_tx: Tx<replica::In<I>>) -> Self {
+        Shared(Arc::new(RwLock::new(State::new(scout_tx, replica_tx))))
+    }
+
     pub fn read(&self) -> RwLockReadGuard<State<I>> {
         self.0.read()
     }
@@ -27,6 +31,15 @@ pub struct State<I> {
 }
 
 impl<I> State<I> {
+    pub fn new(scout_tx: Tx<scout::In<I>>, replica_tx: Tx<replica::In<I>>) -> Self {
+        State {
+            peer_txs: Map::default(),
+            commander_txs: Map::default(),
+            scout_tx,
+            replica_tx,
+        }
+    }
+
     pub fn connect_peer(&mut self, id: usize, tx: Tx<peer::In<I>>) {
         self.peer_txs.insert(id, tx);
     }
