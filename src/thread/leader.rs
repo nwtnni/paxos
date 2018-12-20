@@ -21,7 +21,7 @@ pub struct Leader<I> {
     count: usize,
     self_rx: Rx<In<I>>,
     self_tx: Tx<In<I>>,
-    shared_tx: shared::Shared<I>,
+    tx: shared::Shared<I>,
     active: bool,
     ballot: message::BallotID,
     backoff: time::Duration,
@@ -29,6 +29,24 @@ pub struct Leader<I> {
 }
 
 impl<I: state::Identifier> Leader<I> {
+
+    pub fn new(id: usize, count: usize, self_rx: Rx<In<I>>, self_tx: Tx<In<I>>, tx: shared::Shared<I>) -> Self {
+        Leader {
+            id,
+            count,
+            self_rx,
+            self_tx,
+            tx,
+            active: false,
+            ballot: message::BallotID {
+                b_id: 1,
+                l_id: id,
+            },
+            backoff: time::Duration::from_millis(50),
+            proposals: Map::default(),
+        }
+    }
+
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.self_rx.next()) {
@@ -104,7 +122,7 @@ impl<I: state::Identifier> Leader<I> {
         };
         let commander = commander::Commander::new(
                 self.self_tx.clone(),
-                self.shared_tx.clone(),
+                self.tx.clone(),
                 pvalue,
                 self.count
         );
@@ -116,7 +134,7 @@ impl<I: state::Identifier> Leader<I> {
     fn spawn_scout(&mut self) {
         let scout = scout::Scout::new(
             self.self_tx.clone(),
-            self.shared_tx.clone(),
+            self.tx.clone(),
             self.ballot,
             self.count,
             self.backoff,
