@@ -18,12 +18,14 @@ pub trait Serializable: std::fmt::Debug
 {
 }
 
+/// Unique identifier for commands
 pub trait CommandID: Identifier {
     type Client: Identifier;
     type Command: Identifier;
     fn client_id(&self) -> Self::Client;
 }
 
+/// Operation that can be applied to a state machine
 pub trait Command: Clone
     + std::marker::Unpin
     + Serializable
@@ -33,6 +35,7 @@ pub trait Command: Clone
     fn id(&self) -> Self::ID;
 }
 
+/// Replicated state machine
 pub trait State {
     type Command: Command;
     fn execute(&mut self, command: Self::Command) -> <Self::Command as Command>::Response;
