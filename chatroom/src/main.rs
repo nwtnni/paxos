@@ -24,6 +24,25 @@ struct Opt {
 
 fn main() {
     let opt = Opt::from_args();
+    let id = opt.id;
+
+    fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}][{}]: {}",
+                id,
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level_for("paxos", log::LevelFilter::Trace)
+        .level_for("tokio_threadpool", log::LevelFilter::Off)
+        .level_for("tokio_reactor", log::LevelFilter::Off)
+        .level_for("mio", log::LevelFilter::Off)
+        .chain(std::io::stdout())
+        .apply()
+        .unwrap();
 
     let config = paxos::Config::<chatroom::State>::new(
             opt.id,
