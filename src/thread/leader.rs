@@ -24,8 +24,9 @@ pub struct Leader<S: state::State> {
     shared_tx: shared::Shared<S>,
     active: bool,
     ballot: message::BallotID,
-    backoff: time::Duration,
     proposals: Map<message::CommandID<S::Command>, usize>,
+    backoff: time::Duration,
+    timeout: time::Duration,
 }
 
 impl<S: state::State> Leader<S> {
@@ -36,6 +37,7 @@ impl<S: state::State> Leader<S> {
         self_rx: Rx<In<S::Command>>,
         self_tx: Tx<In<S::Command>>,
         shared_tx: shared::Shared<S>,
+        timeout: time::Duration,
     ) -> Self {
         Leader {
             id,
@@ -48,8 +50,9 @@ impl<S: state::State> Leader<S> {
                 b_id: 1,
                 l_id: id,
             },
-            backoff: time::Duration::from_millis(50),
             proposals: Map::default(),
+            backoff: time::Duration::from_millis(50),
+            timeout,
         }
     }
 
@@ -129,7 +132,8 @@ impl<S: state::State> Leader<S> {
             self.self_tx.clone(),
             self.shared_tx.clone(),
             pvalue,
-            self.count
+            self.count,
+            self.timeout,
         );
         tokio::spawn_async(async move {
             commander.run();
@@ -143,6 +147,7 @@ impl<S: state::State> Leader<S> {
             self.ballot,
             self.count,
             self.backoff,
+            self.timeout,
         );
         tokio::spawn_async(async move {
             scout.run();

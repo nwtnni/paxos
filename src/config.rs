@@ -18,6 +18,9 @@ pub struct Config<S> {
     /// Total number of replicas
     count: usize,
 
+    /// Timeout for detecting unresponsive servers
+    timeout: std::time::Duration,
+
     _marker: std::marker::PhantomData<S>,
 }
 
@@ -27,12 +30,17 @@ impl<S: state::State> Config<S> {
             id,
             port,
             count,
+            timeout: std::time::Duration::from_secs(1),
             _marker: Default::default(),
         }
     }
 
-    pub async fn run(self) {
+    pub fn with_timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
 
+    pub async fn run(self) {
         let (acceptor_tx, acceptor_rx) = mpsc::unbounded();
         let (leader_tx, leader_rx) = mpsc::unbounded();
         let (scout_tx, _) = mpsc::unbounded();
@@ -75,6 +83,7 @@ impl<S: state::State> Config<S> {
             leader_rx,
             leader_tx.clone(),
             shared_tx.clone(),
+            self.timeout,
         );
 
         let self_id = self.id;
@@ -86,6 +95,7 @@ impl<S: state::State> Config<S> {
                     stream,
                     acceptor_tx.clone(),
                     shared.clone(),
+                    self.timeout,
                 );
                 let peer = await!(connecting.run());
                 tokio::spawn_async(peer.run());

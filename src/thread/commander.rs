@@ -3,7 +3,6 @@ use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::timer;
 
-use crate::constants::COMMANDER_TIMEOUT;
 use crate::message;
 use crate::shared;
 use crate::state;
@@ -27,11 +26,12 @@ impl<S: state::State> Commander<S> {
         leader_tx: Tx<leader::In<S::Command>>,
         shared_tx: shared::Shared<S>,
         pvalue: message::PValue<S::Command>,
-        count: usize
+        count: usize,
+        timeout: std::time::Duration,
     ) -> Self {
         let waiting = (0..count).collect();
         let minority = (count - 1) / 2;
-        let timeout = timer::Interval::new_interval(COMMANDER_TIMEOUT);
+        let timeout = timer::Interval::new_interval(timeout);
         let (self_tx, self_rx) = mpsc::unbounded();
         let id = message::CommanderID {
             b_id: pvalue.b_id,

@@ -4,7 +4,6 @@
 extern crate derivative;
 
 mod config;
-mod constants;
 mod message;
 mod state;
 mod shared;

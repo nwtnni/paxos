@@ -26,6 +26,7 @@ pub struct Connecting<S: state::State> {
     peer_tx: SocketTx,
     acceptor_tx: Tx<acceptor::In<S::Command>>,
     shared_tx: Shared<S>,
+    timeout: std::time::Duration,
 }
 
 impl<S: state::State> Connecting<S> {
@@ -35,6 +36,7 @@ impl<S: state::State> Connecting<S> {
         stream: net::tcp::TcpStream,
         acceptor_tx: Tx<acceptor::In<S::Command>>,
         shared_tx: Shared<S>,
+        timeout: std::time::Duration,
     ) -> Self {
         let (peer_rx, peer_tx) = stream.split();
         let peer_rx = ReadBincode::new(
@@ -51,6 +53,7 @@ impl<S: state::State> Connecting<S> {
             peer_tx,
             acceptor_tx,
             shared_tx,
+            timeout,
         }
     }
 
@@ -69,9 +72,7 @@ impl<S: state::State> Connecting<S> {
                         peer_tx: self.peer_tx,
                         acceptor_tx: self.acceptor_tx,
                         shared_tx: self.shared_tx,
-                        ping: tokio::timer::Interval::new_interval(
-                            std::time::Duration::from_millis(500)
-                        ),
+                        timeout: tokio::timer::Interval::new_interval(self.timeout),
                     }
                 }
                 | _ => (),
@@ -89,7 +90,7 @@ pub struct Peer<S: state::State> {
     peer_tx: SocketTx,
     acceptor_tx: Tx<acceptor::In<S::Command>>,
     shared_tx: Shared<S>,
-    ping: tokio::timer::Interval,
+    timeout: tokio::timer::Interval,
 }
 
 impl<S: state::State> Peer<S> {
@@ -97,7 +98,7 @@ impl<S: state::State> Peer<S> {
     pub async fn run(mut self) {
         loop {
             // Drop connection to unresponsive peers
-            while let Some(_) = await!(self.ping.next()) {
+            while let Some(_) = await!(self.timeout.next()) {
                 if let Err(_) = self.send(In::Ping(self.self_id)) {
                     return
                 }

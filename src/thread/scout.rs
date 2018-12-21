@@ -5,7 +5,6 @@ use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::timer;
 
-use crate::constants::SCOUT_TIMEOUT;
 use crate::message;
 use crate::shared;
 use crate::state;
@@ -30,13 +29,14 @@ impl<S: state::State> Scout<S> {
         shared_tx: shared::Shared<S>, 
         ballot: message::BallotID,
         count: usize,
-        delay: time::Duration
+        delay: time::Duration,
+        timeout: time::Duration,
     ) -> Self {
         let waiting = (0..count).collect();  
         let minority = (count - 1) / 2;
         let timeout = timer::Interval::new(
             time::Instant::now() + delay,
-            SCOUT_TIMEOUT
+            timeout,
         );
         let pvalues = Set::default();
         let (self_tx, self_rx) = mpsc::unbounded();
