@@ -9,6 +9,7 @@ use crate::thread::{commander, scout};
 use crate::shared;
 use crate::state;
 
+#[derive(Debug)]
 pub enum In<C: state::Command> {
     Propose(message::Proposal<C>),
     Preempt(message::BallotID),

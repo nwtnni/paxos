@@ -9,10 +9,9 @@ use crate::shared::Shared;
 use crate::state;
 use crate::thread::*;
 
-#[derive(Serialize, Deserialize)]
-#[serde(bound(serialize = "", deserialize = ""))]
-#[derive(Derivative)]
+#[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Clone(bound = ""))]
+#[serde(bound(serialize = "", deserialize = ""))]
 pub enum In<C: state::Command> {
     P1A(message::P1A),
     P1B(message::P1B<C>),

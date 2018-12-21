@@ -8,6 +8,7 @@ use crate::thread::{commander, peer};
 use crate::shared;
 use crate::state;
 
+#[derive(Debug)]
 pub enum In<C: state::Command> {
     P1A(message::P1A),
     P2A(message::CommanderID, message::P2A<C>),

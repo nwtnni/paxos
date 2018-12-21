@@ -1,5 +1,6 @@
 /// Unique identifier
 pub trait Identifier: std::hash::Hash
+    + std::fmt::Debug
     + std::marker::Unpin
     + serde::Serialize
     + serde::de::DeserializeOwned
@@ -12,6 +13,7 @@ pub trait Identifier: std::hash::Hash
 
 /// Operation that can be applied to a state machine
 pub trait Command: Send
+    + std::fmt::Debug
     + std::marker::Unpin
     + serde::Serialize
     + serde::de::DeserializeOwned

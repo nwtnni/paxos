@@ -9,6 +9,7 @@ use crate::state;
 use crate::state::Command;
 use crate::thread::*;
 
+#[derive(Debug)]
 pub enum In<C: state::Command> {
     Request(C),
     Decision(message::Proposal<C>),
