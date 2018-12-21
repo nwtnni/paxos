@@ -42,7 +42,7 @@ impl paxos::Command for Command {
 impl paxos::State for State {
     type Command = Command;
     type Response = Response;
-    fn execute(&mut self, slot: usize, command: Self::Command) -> Option<Self::Response> {
+    fn execute(&mut self, _: usize, command: Self::Command) -> Option<Self::Response> {
         match command.mode {
         | Mode::Get => {
             Some(Response::Messages(self.messages.clone()))

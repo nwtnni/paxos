@@ -13,6 +13,7 @@ mod socket;
 use crate::command::{Command, Execution};
 
 #[derive(StructOpt)]
+#[structopt(name = "harness")]
 struct Opt {
     #[structopt(short = "s", long = "server")]
     server: std::path::PathBuf,
@@ -29,8 +30,10 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let execution: Execution = std::fs::File::open(opt.file)
         .map(serde_json::from_reader)??;
 
+    // TCP incoming connections
     let mut readers: Map<usize, socket::Rx> = Map::default();
 
+    // TCP outgoing connections
     let mut writers: Map<usize, Arc<Mutex<socket::Tx>>> = Map::default();
 
     // Running servers
