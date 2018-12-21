@@ -7,7 +7,7 @@ use crate::constants::COMMANDER_TIMEOUT;
 use crate::message;
 use crate::shared;
 use crate::state;
-use crate::thread::{leader, peer, Tx, Rx};
+use crate::thread::{leader, peer, replica, Tx, Rx};
 
 pub type In = message::P2B;
 
@@ -100,7 +100,7 @@ impl<S: state::State> Commander<S> {
         };
         self.shared_tx
             .read()
-            .send_replica(decide);
+            .send_replica(replica::In::Decision(decide));
     }
 
     fn send_preempt(self, b_id: message::BallotID) {

@@ -9,7 +9,7 @@ use crate::thread::{SocketRx, SocketTx, Rx, Tx, replica};
 pub type In<C> = message::Proposal<C>;
 
 pub struct Client<S: state::State> {
-    socket_rx: SocketRx<In<S::Command>>,
+    socket_rx: SocketRx<S::Command>,
     socket_tx: SocketTx,
     replica_tx: Tx<replica::In<S::Command>>,
     shared_tx: shared::Shared<S>,
@@ -20,7 +20,7 @@ impl<S: state::State> Client<S> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.socket_rx.next()) {
-                self.replica_tx.unbounded_send(message)
+                self.replica_tx.unbounded_send(replica::In::Request(message))
                     .expect("[INTERNAL ERROR]: failed to send to replica")
             }
 

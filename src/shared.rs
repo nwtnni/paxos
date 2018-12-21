@@ -30,7 +30,7 @@ impl<S: state::State> Shared<S> {
 
 pub struct State<S: state::State> {
     peer_txs: Map<usize, Tx<peer::In<S::Command>>>,
-    client_txs: Map<message::CommandID<S::Command>, Tx<S::Response>>,
+    client_txs: Map<<S::Command as state::Command>::ClientID, Tx<S::Response>>,
     commander_txs: Map<message::CommanderID, Tx<commander::In>>,
     scout_tx: Tx<scout::In<S::Command>>,
     replica_tx: Tx<replica::In<S::Command>>,
@@ -62,11 +62,11 @@ impl<S: state::State> State<S> {
         self.peer_txs.remove(&id);
     }
 
-    pub fn connect_client(&mut self, id: message::CommandID<S::Command>, tx: Tx<S::Response>) {
+    pub fn connect_client(&mut self, id: <S::Command as state::Command>::ClientID, tx: Tx<S::Response>) {
         self.client_txs.insert(id, tx);
     }
 
-    pub fn disconnect_client(&mut self, id: message::CommandID<S::Command>) {
+    pub fn disconnect_client(&mut self, id: <S::Command as state::Command>::ClientID) {
         self.client_txs.remove(&id);
     }
 
@@ -97,6 +97,12 @@ impl<S: state::State> State<S> {
     pub fn send_scout(&self, message: scout::In<S::Command>) {
         self.scout_tx.unbounded_send(message)
             .expect("[INTERNAL ERROR]: failed to send to replica");
+    }
+
+    pub fn send_client(&self, id: <S::Command as state::Command>::ClientID, message: S::Response) {
+        if let Some(tx) = self.client_txs.get(&id) {
+            let _ = tx.unbounded_send(message);
+        }
     }
 
     pub fn send(&self, id: usize, message: peer::In<S::Command>) {
