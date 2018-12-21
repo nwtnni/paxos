@@ -41,12 +41,6 @@ impl paxos::Command for Command {
     }
 }
 
-impl paxos::Response for Response {
-    fn connected(replica_id: usize) -> Self {
-        Response::Connected(replica_id)
-    }
-}
-
 impl paxos::State for State {
     type Command = Command;
     type Response = Response;

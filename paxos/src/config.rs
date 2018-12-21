@@ -106,7 +106,6 @@ impl<S: state::State> Config<S> {
         tokio::spawn_async(async move {
             while let Some(Ok(stream)) = await!(external_port.next()) {
                 let connecting = thread::client::Connecting::new(
-                    self_id,
                     stream,
                     replica_tx.clone(),
                     shared.clone(),

@@ -41,7 +41,12 @@ pub trait Response: Send
     + serde::Serialize
     + serde::de::DeserializeOwned
 {
-    fn connected(replica_id: usize) -> Self;
+}
+
+impl<T> Response for T where T: Send
+    + serde::Serialize
+    + serde::de::DeserializeOwned
+{
 }
 
 /// Replicated state machine
