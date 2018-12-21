@@ -3,37 +3,44 @@ use std::sync::Arc;
 use hashbrown::HashMap as Map;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+use crate::message;
 use crate::state;
-use crate::thread::{client, commander, peer, replica, scout, Tx};
+use crate::thread::{commander, peer, replica, scout, Tx};
 
-#[derive(Debug, Clone)]
-pub struct Shared<I: state::CommandID>(Arc<RwLock<State<I>>>);
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct Shared<S: state::State>(Arc<RwLock<State<S>>>);
 
-impl<I: state::CommandID> Shared<I> {
-    pub fn new(scout_tx: Tx<scout::In<I>>, replica_tx: Tx<replica::In<I>>) -> Self {
+impl<S: state::State> Shared<S> {
+    pub fn new(
+        scout_tx: Tx<scout::In<S::Command>>,
+        replica_tx: Tx<replica::In<S::Command>>
+    ) -> Self {
         Shared(Arc::new(RwLock::new(State::new(scout_tx, replica_tx))))
     }
 
-    pub fn read(&self) -> RwLockReadGuard<State<I>> {
+    pub fn read(&self) -> RwLockReadGuard<State<S>> {
         self.0.read()
     }
 
-    pub fn write(&self) -> RwLockWriteGuard<State<I>> {
+    pub fn write(&self) -> RwLockWriteGuard<State<S>> {
         self.0.write()
     }
 }
 
-#[derive(Debug)]
-pub struct State<I: state::CommandID> {
-    peer_txs: Map<usize, Tx<peer::In<I>>>,
-    client_txs: Map<I::Client, Tx<client::In<I>>>,
+pub struct State<S: state::State> {
+    peer_txs: Map<usize, Tx<peer::In<S::Command>>>,
+    client_txs: Map<message::CommandID<S::Command>, Tx<S::Response>>,
     commander_txs: Map<commander::ID, Tx<commander::In>>,
-    scout_tx: Tx<scout::In<I>>,
-    replica_tx: Tx<replica::In<I>>,
+    scout_tx: Tx<scout::In<S::Command>>,
+    replica_tx: Tx<replica::In<S::Command>>,
 }
 
-impl<I: state::CommandID> State<I> {
-    pub fn new(scout_tx: Tx<scout::In<I>>, replica_tx: Tx<replica::In<I>>) -> Self {
+impl<S: state::State> State<S> {
+    pub fn new(
+        scout_tx: Tx<scout::In<S::Command>>,
+        replica_tx: Tx<replica::In<S::Command>>
+    ) -> Self {
         State {
             peer_txs: Map::default(),
             client_txs: Map::default(),
@@ -43,16 +50,24 @@ impl<I: state::CommandID> State<I> {
         }
     }
 
-    pub fn replica_tx(&self) -> &Tx<replica::In<I>> {
+    pub fn replica_tx(&self) -> &Tx<replica::In<S::Command>> {
         &self.replica_tx
     }
 
-    pub fn connect_peer(&mut self, id: usize, tx: Tx<peer::In<I>>) {
+    pub fn connect_peer(&mut self, id: usize, tx: Tx<peer::In<S::Command>>) {
         self.peer_txs.insert(id, tx);
     }
 
     pub fn disconnect_peer(&mut self, id: usize) {
         self.peer_txs.remove(&id);
+    }
+
+    pub fn connect_client(&mut self, id: message::CommandID<S::Command>, tx: Tx<S::Response>) {
+        self.client_txs.insert(id, tx);
+    }
+
+    pub fn disconnect_client(&mut self, id: message::CommandID<S::Command>) {
+        self.client_txs.remove(&id);
     }
 
     pub fn connect_commander(&mut self, id: commander::ID, tx: Tx<commander::In>) {
@@ -63,7 +78,7 @@ impl<I: state::CommandID> State<I> {
         self.commander_txs.remove(&id);
     }
 
-    pub fn replace_scout(&mut self, tx: Tx<scout::In<I>>) {
+    pub fn replace_scout(&mut self, tx: Tx<scout::In<S::Command>>) {
         std::mem::replace(&mut self.scout_tx, tx);
     }
 
@@ -74,29 +89,29 @@ impl<I: state::CommandID> State<I> {
         }
     }
 
-    pub fn send_replica(&self, message: replica::In<I>) {
+    pub fn send_replica(&self, message: replica::In<S::Command>) {
         self.replica_tx.unbounded_send(message)
             .expect("[INTERNAL ERROR]: failed to send to replica");
     }
 
-    pub fn send_scout(&self, message: scout::In<I>) {
+    pub fn send_scout(&self, message: scout::In<S::Command>) {
         self.scout_tx.unbounded_send(message)
             .expect("[INTERNAL ERROR]: failed to send to replica");
     }
 
-    pub fn send(&self, id: usize, message: peer::In<I>) {
+    pub fn send(&self, id: usize, message: peer::In<S::Command>) {
         if let Some(tx) = self.peer_txs.get(&id) {
             let _ = tx.unbounded_send(message);
         }
     }
 
-    pub fn broadcast(&self, message: peer::In<I>) {
+    pub fn broadcast(&self, message: peer::In<S::Command>) {
         for id in self.peer_txs.keys() {
             self.send(*id, message.clone());
         }
     }
 
-    pub fn narrowcast<'a, T>(&self, ids: T, message: peer::In<I>)
+    pub fn narrowcast<'a, T>(&self, ids: T, message: peer::In<S::Command>)
         where T: IntoIterator<Item = &'a usize>
     {
         for id in ids.into_iter() {

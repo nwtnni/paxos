@@ -5,32 +5,37 @@ use tokio::prelude::*;
 
 use crate::message;
 use crate::thread::{Tx, Rx};
-use crate::thread::{commander, replica, scout};
+use crate::thread::{commander, scout};
 use crate::shared;
 use crate::state;
 
-#[derive(Clone, Debug)]
-pub enum In<I> {
-    Propose(message::Proposal<I>),
+pub enum In<C: state::Command> {
+    Propose(message::Proposal<C>),
     Preempt(message::BallotID),
-    Adopt(Vec<message::PValue<I>>),
+    Adopt(Vec<message::PValue<C>>),
 }
 
-pub struct Leader<I: state::CommandID> {
+pub struct Leader<S: state::State> {
     id: usize,
     count: usize,
-    self_rx: Rx<In<I>>,
-    self_tx: Tx<In<I>>,
-    shared_tx: shared::Shared<I>,
+    self_rx: Rx<In<S::Command>>,
+    self_tx: Tx<In<S::Command>>,
+    shared_tx: shared::Shared<S>,
     active: bool,
     ballot: message::BallotID,
     backoff: time::Duration,
-    proposals: Map<I, usize>,
+    proposals: Map<message::CommandID<S::Command>, usize>,
 }
 
-impl<I: state::CommandID> Leader<I> {
+impl<S: state::State> Leader<S> {
 
-    pub fn new(id: usize, count: usize, self_rx: Rx<In<I>>, self_tx: Tx<In<I>>, shared_tx: shared::Shared<I>) -> Self {
+    pub fn new(
+        id: usize,
+        count: usize,
+        self_rx: Rx<In<S::Command>>,
+        self_tx: Tx<In<S::Command>>,
+        shared_tx: shared::Shared<S>,
+    ) -> Self {
         Leader {
             id,
             count,
@@ -59,7 +64,7 @@ impl<I: state::CommandID> Leader<I> {
         }
     }
 
-    fn respond_propose(&mut self, proposal: message::Proposal<I>) {
+    fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
         if self.proposals.contains_key(&proposal.c_id) {
             return
         }
@@ -79,7 +84,7 @@ impl<I: state::CommandID> Leader<I> {
         self.spawn_scout();
     }
 
-    fn respond_adopt(&mut self, pvalues: Vec<message::PValue<I>>) {
+    fn respond_adopt(&mut self, pvalues: Vec<message::PValue<S::Command>>) {
         for (op, s_id) in Self::pmax(pvalues) {
             self.proposals.insert(op, s_id);
         }
@@ -98,9 +103,9 @@ impl<I: state::CommandID> Leader<I> {
         self.active = true;
     }
 
-    fn pmax<T>(pvalues: T) -> impl Iterator<Item = (I, usize)>
-        where T: IntoIterator<Item = message::PValue<I>> {
-        let mut pmax: Map<usize, (message::BallotID, I)> = Map::default();
+    fn pmax<I>(pvalues: I) -> impl Iterator<Item = (message::CommandID<S::Command>, usize)>
+        where I: IntoIterator<Item = message::PValue<S::Command>> {
+        let mut pmax: Map<usize, (message::BallotID, message::CommandID<S::Command>)> = Map::default();
         for pvalue in pvalues.into_iter() {
             pmax.entry(pvalue.s_id)
                 .and_modify(|(b_id, c_id)| {
@@ -113,7 +118,7 @@ impl<I: state::CommandID> Leader<I> {
         pmax.into_iter().map(|(s_id, (_, op))| (op, s_id))
     }
 
-    fn spawn_commander(&mut self, proposal: message::Proposal<I>) {
+    fn spawn_commander(&mut self, proposal: message::Proposal<S::Command>) {
         let id = (self.ballot, proposal.s_id);
         let pvalue = message::PValue {
             s_id: proposal.s_id,

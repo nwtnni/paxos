@@ -16,21 +16,21 @@ pub type In<C> = message::Proposal<C>;
 pub struct Replica<S: state::State> {
     client_rx: SocketRx<S::Command>,
     client_tx: SocketTx,
-    leader_tx: Tx<leader::In<<S::Command as state::Command>::ID>>,
-    rx: Rx<In<<S::Command as state::Command>::ID>>,
+    leader_tx: Tx<leader::In<S::Command>>,
+    rx: Rx<In<S::Command>>,
     state: S,
     slot: usize,
-    proposals: BiMap<<S::Command as state::Command>::ID, usize>,
-    decisions: BiMap<<S::Command as state::Command>::ID, usize>,
-    commands: Map<<S::Command as state::Command>::ID, S::Command>,
+    proposals: BiMap<message::CommandID<S::Command>, usize>,
+    decisions: BiMap<message::CommandID<S::Command>, usize>,
+    commands: Map<message::CommandID<S::Command>, S::Command>,
 }
 
 impl<S: state::State> Replica<S> {
     pub fn new(
         client: net::tcp::TcpStream,   
-        leader_tx: Tx<leader::In<<S::Command as state::Command>::ID>>,
-        shared_tx: shared::Shared<<S::Command as state::Command>::ID>,
-        rx: Rx<In<<S::Command as state::Command>::ID>>,
+        leader_tx: Tx<leader::In<S::Command>>,
+        shared_tx: shared::Shared<S>,
+        rx: Rx<In<S::Command>>,
         state: S,
     ) -> Self {
         let (client_rx, client_tx) = client.split();
@@ -71,12 +71,15 @@ impl<S: state::State> Replica<S> {
     }
 
     fn respond_request(&mut self, request: S::Command) {
-        let c_id = request.id().clone();
+        let c_id = message::CommandID {
+            c_id: request.client_id(),
+            l_id: request.local_id(),
+        };
         self.commands.insert(c_id.clone(), request);
         self.propose(c_id);
     }
 
-    fn respond_decision(&mut self, decision: message::Proposal<<S::Command as state::Command>::ID>) {
+    fn respond_decision(&mut self, decision: message::Proposal<S::Command>) {
         self.decisions.insert(decision.c_id, decision.s_id);
 
         while let Some(c1) = self.decisions.get_by_right(&self.slot).cloned() {
@@ -91,7 +94,7 @@ impl<S: state::State> Replica<S> {
         }
     }
 
-    fn propose(&mut self, c_id: <S::Command as state::Command>::ID) {
+    fn propose(&mut self, c_id: message::CommandID<S::Command>) {
         if self.decisions.contains_left(&c_id) { return }
 
         let next = 1 + std::cmp::max(
@@ -111,7 +114,11 @@ impl<S: state::State> Replica<S> {
     }
 
     fn perform(&mut self, c: S::Command) {
-        if let Some(s) = self.decisions.get_by_left(&c.id()) {
+        let c_id = message::CommandID {
+            c_id: c.client_id(),
+            l_id: c.local_id(),
+        };
+        if let Some(s) = self.decisions.get_by_left(&c_id) {
             if *s < self.slot {
                 self.slot += 1;
                 return

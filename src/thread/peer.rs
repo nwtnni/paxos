@@ -9,31 +9,33 @@ use crate::state;
 use crate::thread::*;
 
 #[derive(Serialize, Deserialize)]
-#[derive(Clone, Debug)]
-pub enum In<I> {
+#[serde(bound(serialize = "", deserialize = ""))]
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub enum In<C: state::Command> {
     P1A(message::P1A),
-    P1B(message::P1B<I>),
-    P2A(commander::ID, message::P2A<I>),
+    P1B(message::P1B<C>),
+    P2A(commander::ID, message::P2A<C>),
     P2B(commander::ID, message::P2B),
     Ping(usize),
 }
 
-pub struct Connecting<I: state::CommandID> {
+pub struct Connecting<S: state::State> {
     self_id: usize,
-    peer_rx: SocketRx<In<I>>,
+    peer_rx: SocketRx<In<S::Command>>,
     peer_tx: SocketTx,
-    acceptor_tx: Tx<acceptor::In<I>>,
-    shared_tx: Shared<I>,
+    acceptor_tx: Tx<acceptor::In<S::Command>>,
+    shared_tx: Shared<S>,
 }
 
-impl<I: state::CommandID> Connecting<I> {
+impl<S: state::State> Connecting<S> {
 
     pub fn new(
         self_id: usize,
-        peer_rx: SocketRx<In<I>>,
+        peer_rx: SocketRx<In<S::Command>>,
         peer_tx: SocketTx,
-        acceptor_tx: Tx<acceptor::In<I>>,
-        shared_tx: Shared<I>,
+        acceptor_tx: Tx<acceptor::In<S::Command>>,
+        shared_tx: Shared<S>,
     ) -> Self {
         Connecting {
             self_id,
@@ -77,18 +79,18 @@ impl<I: state::CommandID> Connecting<I> {
     }
 }
 
-pub struct Peer<I: state::CommandID> {
+pub struct Peer<S: state::State> {
     peer_id: usize,
     self_id: usize,
-    rx: Rx<In<I>>,
-    peer_rx: SocketRx<In<I>>,
+    rx: Rx<In<S::Command>>,
+    peer_rx: SocketRx<In<S::Command>>,
     peer_tx: SocketTx,
-    acceptor_tx: Tx<acceptor::In<I>>,
-    shared_tx: Shared<I>,
+    acceptor_tx: Tx<acceptor::In<S::Command>>,
+    shared_tx: Shared<S>,
     ping: tokio::timer::Interval,
 }
 
-impl<I: state::CommandID> Peer<I> {
+impl<S: state::State> Peer<S> {
 
     pub async fn run(mut self) {
         loop {
@@ -111,7 +113,7 @@ impl<I: state::CommandID> Peer<I> {
         }
     }
 
-    fn respond_incoming(&self, message: In<I>) {
+    fn respond_incoming(&self, message: In<S::Command>) {
         match message {
         | In::P1A(p1a) => {
             self.acceptor_tx
@@ -133,7 +135,7 @@ impl<I: state::CommandID> Peer<I> {
         }
     }
 
-    fn send(&mut self, message: In<I>) -> Result<(), ()> {
+    fn send(&mut self, message: In<S::Command>) -> Result<(), ()> {
         WriteBincode::new(&mut self.peer_tx)
             .send(message)
             .wait()
@@ -142,7 +144,7 @@ impl<I: state::CommandID> Peer<I> {
     }
 }
 
-impl<I: state::CommandID> Drop for Peer<I> {
+impl<S: state::State> Drop for Peer<S> {
     fn drop(&mut self) {
         self.shared_tx.write().disconnect_peer(self.peer_id);
     }

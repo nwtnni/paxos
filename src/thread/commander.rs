@@ -7,28 +7,28 @@ use crate::constants::COMMANDER_TIMEOUT;
 use crate::message;
 use crate::shared;
 use crate::state;
-use crate::thread::{leader, peer, replica, Tx, Rx};
+use crate::thread::{leader, peer, Tx, Rx};
 
 pub type In = message::P2B;
 
 pub type ID = (message::BallotID, usize);
 
-pub struct Commander<I: state::CommandID> {
+pub struct Commander<S: state::State> {
     id: ID,
     rx: Rx<In>,
-    leader_tx: Tx<leader::In<I>>,
-    shared_tx: shared::Shared<I>,
+    leader_tx: Tx<leader::In<S::Command>>,
+    shared_tx: shared::Shared<S>,
     waiting: Set<usize>,
     minority: usize,
-    pvalue: message::PValue<I>,
+    pvalue: message::PValue<S::Command>,
     timeout: timer::Interval,
 }
 
-impl<I: state::CommandID> Commander<I> {
+impl<S: state::State> Commander<S> {
     pub fn new(
-        leader_tx: Tx<leader::In<I>>,
-        shared_tx: shared::Shared<I>,
-        pvalue: message::PValue<I>,
+        leader_tx: Tx<leader::In<S::Command>>,
+        shared_tx: shared::Shared<S>,
+        pvalue: message::PValue<S::Command>,
         count: usize
     ) -> Self {
         let waiting = (0..count).collect();
@@ -103,14 +103,14 @@ impl<I: state::CommandID> Commander<I> {
     }
 
     fn send_preempt(self, b_id: message::BallotID) {
-        let preempt = leader::In::Preempt::<I>(b_id); 
+        let preempt = leader::In::Preempt::<S::Command>(b_id); 
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempted");
     }
 }
 
-impl<I: state::CommandID> Drop for Commander<I> {
+impl<S: state::State> Drop for Commander<S> {
     fn drop(&mut self) {
         self.shared_tx.write().disconnect_commander(self.id);
     }

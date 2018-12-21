@@ -8,15 +8,15 @@ use crate::thread::{SocketRx, SocketTx, Rx, Tx, replica};
 
 pub type In<C> = message::Proposal<C>;
 
-pub struct Client<C: state::Command> {
-    socket_rx: SocketRx<In<C::ID>>,
+pub struct Client<S: state::State> {
+    socket_rx: SocketRx<In<S::Command>>,
     socket_tx: SocketTx,
-    replica_tx: Tx<replica::In<C::ID>>,
-    shared_tx: shared::Shared<C::ID>,
-    rx: Rx<In<C::ID>>,
+    replica_tx: Tx<replica::In<S::Command>>,
+    shared_tx: shared::Shared<S>,
+    rx: Rx<S::Response>,
 }
 
-impl<C: state::Command> Client<C> {
+impl<S: state::State> Client<S> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.socket_rx.next()) {

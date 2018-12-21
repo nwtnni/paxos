@@ -44,7 +44,7 @@ impl<S: state::State> Config<S> {
             .parse::<std::net::SocketAddr>()
             .unwrap();
 
-        let shared_tx: shared::Shared<<S::Command as state::Command>::ID> = shared::Shared::new(
+        let shared_tx: shared::Shared<S> = shared::Shared::new(
             scout_tx,
             replica_tx
         );
@@ -62,9 +62,5 @@ impl<S: state::State> Config<S> {
             leader_tx.clone(),
             shared_tx.clone(),
         );
-
-
-
-
     }
 }

@@ -8,24 +8,22 @@ use crate::thread::{commander, peer};
 use crate::shared;
 use crate::state;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum In<I> {
+pub enum In<C: state::Command> {
     P1A(message::P1A),
-    P2A(commander::ID, message::P2A<I>),
+    P2A(commander::ID, message::P2A<C>),
 }
 
-#[derive(Debug)]
-pub struct Acceptor<I: state::CommandID> {
+pub struct Acceptor<S: state::State> {
     id: usize,
     ballot: message::BallotID,
-    accepted: Map<usize, message::PValue<I>>,
-    rx: Rx<In<I>>,
-    shared_tx: shared::Shared<I>,
+    accepted: Map<usize, message::PValue<S::Command>>,
+    rx: Rx<In<S::Command>>,
+    shared_tx: shared::Shared<S>,
 }
 
-impl<I: state::CommandID> Acceptor<I> {
+impl<S: state::State> Acceptor<S> {
 
-    pub fn new(id: usize, rx: Rx<In<I>>, shared_tx: shared::Shared<I>) -> Self {
+    pub fn new(id: usize, rx: Rx<In<S::Command>>, shared_tx: shared::Shared<S>) -> Self {
         Acceptor {
             id, 
             ballot: message::BallotID::default(),
@@ -58,7 +56,7 @@ impl<I: state::CommandID> Acceptor<I> {
         self.shared_tx.read().send(ballot.l_id, p1b)
     }
 
-    fn send_p2a(&mut self, c_id: commander::ID, pvalue: message::P2A<I>) {
+    fn send_p2a(&mut self, c_id: commander::ID, pvalue: message::P2A<S::Command>) {
         if pvalue.b_id >= self.ballot {
             self.ballot = pvalue.b_id;
             self.accepted.insert(pvalue.s_id, pvalue.clone());
