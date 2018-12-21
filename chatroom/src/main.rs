@@ -1,4 +1,4 @@
-mod execution;
+mod server;
 
 fn main() {
     println!("Hello, world!");

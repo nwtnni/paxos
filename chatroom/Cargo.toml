@@ -1,11 +1,10 @@
 [package]
-name = "harness"
+name = "chatroom"
 version = "0.1.0"
 authors = ["Newton Ni <nwtnni@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 paxos = { path = "../paxos" }
-serde_json = "1.0.33"
-serde_derive = "1.0.82"
 serde = "1.0.82"
+serde_derive = "1.0.82"

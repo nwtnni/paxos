@@ -11,6 +11,18 @@ pub trait Identifier: std::hash::Hash
 {
 }
 
+impl<T> Identifier for T where T: std::hash::Hash
+    + std::fmt::Debug
+    + std::marker::Unpin
+    + serde::Serialize
+    + serde::de::DeserializeOwned
+    + Clone
+    + Eq
+    + Send
+    + Sync
+{
+}
+
 /// Operation that can be applied to a state machine
 pub trait Command: Send
     + std::fmt::Debug
