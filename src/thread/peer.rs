@@ -15,8 +15,8 @@ use crate::thread::*;
 pub enum In<C: state::Command> {
     P1A(message::P1A),
     P1B(message::P1B<C>),
-    P2A(commander::ID, message::P2A<C>),
-    P2B(commander::ID, message::P2B),
+    P2A(message::CommanderID, message::P2A<C>),
+    P2B(message::CommanderID, message::P2B),
     Ping(usize),
 }
 

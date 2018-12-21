@@ -19,6 +19,13 @@ pub struct BallotID {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CommanderID {
+    pub b_id: BallotID,
+    pub s_id: usize,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]

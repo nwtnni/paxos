@@ -31,7 +31,7 @@ impl<S: state::State> Shared<S> {
 pub struct State<S: state::State> {
     peer_txs: Map<usize, Tx<peer::In<S::Command>>>,
     client_txs: Map<message::CommandID<S::Command>, Tx<S::Response>>,
-    commander_txs: Map<commander::ID, Tx<commander::In>>,
+    commander_txs: Map<message::CommanderID, Tx<commander::In>>,
     scout_tx: Tx<scout::In<S::Command>>,
     replica_tx: Tx<replica::In<S::Command>>,
 }
@@ -70,11 +70,11 @@ impl<S: state::State> State<S> {
         self.client_txs.remove(&id);
     }
 
-    pub fn connect_commander(&mut self, id: commander::ID, tx: Tx<commander::In>) {
+    pub fn connect_commander(&mut self, id: message::CommanderID, tx: Tx<commander::In>) {
         self.commander_txs.insert(id, tx);
     }
 
-    pub fn disconnect_commander(&mut self, id: commander::ID) {
+    pub fn disconnect_commander(&mut self, id: message::CommanderID) {
         self.commander_txs.remove(&id);
     }
 
@@ -82,7 +82,7 @@ impl<S: state::State> State<S> {
         std::mem::replace(&mut self.scout_tx, tx);
     }
 
-    pub fn send_commander(&self, c_id: commander::ID, message: commander::In) {
+    pub fn send_commander(&self, c_id: message::CommanderID, message: commander::In) {
         if let Some(tx) = self.commander_txs.get(&c_id) {
             tx.unbounded_send(message)
                 .expect("[INTERNAL ERROR]: failed to send to commander");

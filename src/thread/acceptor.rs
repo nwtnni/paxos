@@ -10,7 +10,7 @@ use crate::state;
 
 pub enum In<C: state::Command> {
     P1A(message::P1A),
-    P2A(commander::ID, message::P2A<C>),
+    P2A(message::CommanderID, message::P2A<C>),
 }
 
 pub struct Acceptor<S: state::State> {
@@ -56,7 +56,7 @@ impl<S: state::State> Acceptor<S> {
         self.shared_tx.read().send(ballot.l_id, p1b)
     }
 
-    fn send_p2a(&mut self, c_id: commander::ID, pvalue: message::P2A<S::Command>) {
+    fn send_p2a(&mut self, c_id: message::CommanderID, pvalue: message::P2A<S::Command>) {
         if pvalue.b_id >= self.ballot {
             self.ballot = pvalue.b_id;
             self.accepted.insert(pvalue.s_id, pvalue.clone());

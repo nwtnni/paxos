@@ -11,10 +11,8 @@ use crate::thread::{leader, peer, Tx, Rx};
 
 pub type In = message::P2B;
 
-pub type ID = (message::BallotID, usize);
-
 pub struct Commander<S: state::State> {
-    id: ID,
+    id: message::CommanderID,
     rx: Rx<In>,
     leader_tx: Tx<leader::In<S::Command>>,
     shared_tx: shared::Shared<S>,
@@ -35,7 +33,10 @@ impl<S: state::State> Commander<S> {
         let minority = (count - 1) / 2;
         let timeout = timer::Interval::new_interval(COMMANDER_TIMEOUT);
         let (self_tx, self_rx) = mpsc::unbounded();
-        let id = (pvalue.b_id, pvalue.s_id);
+        let id = message::CommanderID {
+            b_id: pvalue.b_id,
+            s_id: pvalue.s_id,
+        };
         shared_tx.write().connect_commander(id, self_tx);
         Commander {
             id,
