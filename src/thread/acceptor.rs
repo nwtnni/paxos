@@ -4,7 +4,7 @@ use tokio::prelude::*;
 
 use crate::message;
 use crate::thread::Rx;
-use crate::thread::{commander, peer};
+use crate::thread::peer;
 use crate::shared;
 use crate::state;
 

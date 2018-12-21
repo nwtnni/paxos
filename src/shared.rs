@@ -50,10 +50,6 @@ impl<S: state::State> State<S> {
         }
     }
 
-    pub fn replica_tx(&self) -> &Tx<replica::In<S::Command>> {
-        &self.replica_tx
-    }
-
     pub fn connect_peer(&mut self, id: usize, tx: Tx<peer::In<S::Command>>) {
         self.peer_txs.insert(id, tx);
     }
@@ -66,8 +62,8 @@ impl<S: state::State> State<S> {
         self.client_txs.insert(id, tx);
     }
 
-    pub fn disconnect_client(&mut self, id: <S::Command as state::Command>::ClientID) {
-        self.client_txs.remove(&id);
+    pub fn disconnect_client(&mut self, id: &<S::Command as state::Command>::ClientID) {
+        self.client_txs.remove(id);
     }
 
     pub fn connect_commander(&mut self, id: message::CommanderID, tx: Tx<commander::In>) {
@@ -108,12 +104,6 @@ impl<S: state::State> State<S> {
     pub fn send(&self, id: usize, message: peer::In<S::Command>) {
         if let Some(tx) = self.peer_txs.get(&id) {
             let _ = tx.unbounded_send(message);
-        }
-    }
-
-    pub fn broadcast(&self, message: peer::In<S::Command>) {
-        for id in self.peer_txs.keys() {
-            self.send(*id, message.clone());
         }
     }
 

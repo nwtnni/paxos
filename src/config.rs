@@ -1,5 +1,3 @@
-use std::marker;
-
 use futures::sync::mpsc;
 use tokio::prelude::*;
 

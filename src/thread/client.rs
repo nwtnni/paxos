@@ -3,13 +3,10 @@ use tokio_serde_bincode::{ReadBincode, WriteBincode};
 use tokio::prelude::*;
 use tokio::{codec, net};
 
-use crate::message;
 use crate::shared;
 use crate::state;
 use crate::state::{Command, Response};
 use crate::thread::{SocketRx, SocketTx, Rx, Tx, replica};
-
-pub type In<C> = message::Proposal<C>;
 
 pub struct Connecting<S: state::State> {
     self_id: usize,
@@ -54,7 +51,6 @@ impl<S: state::State> Connecting<S> {
                     .send(S::Response::connected(self.self_id))
                     .wait()?;
                 return Ok(Client {
-                    self_id: self.self_id,
                     client_id,
                     client_rx: self.client_rx,
                     client_tx: self.client_tx,
@@ -68,7 +64,6 @@ impl<S: state::State> Connecting<S> {
 }
 
 pub struct Client<S: state::State> {
-    self_id: usize,
     client_id: <S::Command as state::Command>::ClientID,
     client_rx: SocketRx<S::Command>,
     client_tx: SocketTx,
@@ -93,5 +88,11 @@ impl<S: state::State> Client<S> {
                 }
             }
         }
+    }
+}
+
+impl<S: state::State> Drop for Client<S> {
+    fn drop(&mut self) {
+        self.shared_tx.write().disconnect_client(&self.client_id);
     }
 }

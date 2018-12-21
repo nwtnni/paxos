@@ -120,17 +120,16 @@ impl<S: state::State> Leader<S> {
     }
 
     fn spawn_commander(&mut self, proposal: message::Proposal<S::Command>) {
-        let id = (self.ballot, proposal.s_id);
         let pvalue = message::PValue {
             s_id: proposal.s_id,
             b_id: self.ballot,
             c_id: proposal.c_id,
         };
         let commander = commander::Commander::new(
-                self.self_tx.clone(),
-                self.shared_tx.clone(),
-                pvalue,
-                self.count
+            self.self_tx.clone(),
+            self.shared_tx.clone(),
+            pvalue,
+            self.count
         );
         tokio::spawn_async(async move {
             commander.run();
