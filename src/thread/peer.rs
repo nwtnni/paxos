@@ -2,6 +2,7 @@ use futures::sync::mpsc;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 use tokio_serde_bincode::WriteBincode;
+use tokio::{codec, net};
 
 use crate::message;
 use crate::shared::Shared;
@@ -32,11 +33,19 @@ impl<S: state::State> Connecting<S> {
 
     pub fn new(
         self_id: usize,
-        peer_rx: SocketRx<In<S::Command>>,
-        peer_tx: SocketTx,
+        stream: net::tcp::TcpStream,
         acceptor_tx: Tx<acceptor::In<S::Command>>,
         shared_tx: Shared<S>,
     ) -> Self {
+        let (peer_rx, peer_tx) = stream.split();
+        let peer_rx = ReadBincode::new(
+            codec::length_delimited::Builder::new()
+                .new_read(peer_rx)
+                .from_err::<bincode::Error>()
+        );
+        let peer_tx = codec::length_delimited::Builder::new()
+            .new_write(peer_tx)
+            .sink_from_err::<bincode::Error>();
         Connecting {
             self_id,
             peer_rx,
@@ -46,14 +55,14 @@ impl<S: state::State> Connecting<S> {
         }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> Peer<S> {
         loop {
             while let Some(Ok(message)) = await!(self.peer_rx.next()) {
                 match message {
                 | In::Ping(peer_id) => {
                     let (tx, rx) = mpsc::unbounded();
                     self.shared_tx.write().connect_peer(peer_id, tx);
-                    let peer = Peer {
+                    return Peer {
                         self_id: self.self_id,
                         peer_id,
                         rx,
@@ -64,13 +73,7 @@ impl<S: state::State> Connecting<S> {
                         ping: tokio::timer::Interval::new_interval(
                             std::time::Duration::from_millis(500)
                         ),
-                    };
-                    
-                    tokio::spawn_async(async {
-                        peer.run();
-                    });
-
-                    return
+                    }
                 }
                 | _ => (),
                 }

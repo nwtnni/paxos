@@ -30,13 +30,12 @@ impl<S: state::State> Replica<S> {
         leader_tx: Tx<leader::In<S::Command>>,
         shared_tx: shared::Shared<S>,
         rx: Rx<In<S::Command>>,
-        state: S,
     ) -> Self {
         Replica {
             leader_tx,
             shared_tx,
             rx,
-            state,
+            state: S::default(),
             slot: 0,
             proposals: BiMap::default(),
             decisions: BiMap::default(),

@@ -33,10 +33,11 @@ pub trait Response: std::marker::Unpin
     + Send
     + 'static
 {
+    fn connected(replica_id: usize) -> Self;
 }
 
 /// Replicated state machine
-pub trait State: 'static {
+pub trait State: 'static + Default + Send {
     type Command: Command;
     type Response: Response;
     fn execute(&mut self, command: Self::Command) -> Self::Response;
