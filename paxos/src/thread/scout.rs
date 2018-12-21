@@ -41,6 +41,7 @@ impl<S: state::State> Scout<S> {
         let pvalues = Set::default();
         let (self_tx, self_rx) = mpsc::unbounded();
         shared_tx.write().replace_scout(self_tx);
+        debug!("spawning for {:?}", ballot);
         Scout {
             rx: self_rx,
             leader_tx,
@@ -98,6 +99,7 @@ impl<S: state::State> Scout<S> {
     fn send_adopt(self) {
         let pvalues = self.pvalues.into_iter().collect();
         let adopt = leader::In::Adopt(pvalues);
+        debug!("{:?} adopted", self.ballot);
         self.leader_tx
             .unbounded_send(adopt)
             .expect("[INTERNAL ERROR]: failed to send adopt");
@@ -105,6 +107,7 @@ impl<S: state::State> Scout<S> {
 
     fn send_preempt(self, b_id: message::BallotID) {
         let preempt = leader::In::Preempt::<S::Command>(b_id); 
+        debug!("{:?} preempted by {:?}", self.ballot, b_id);
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempt");

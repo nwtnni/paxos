@@ -59,6 +59,7 @@ impl<S: state::State> Leader<S> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.self_rx.next()) {
+                trace!("received message {:?}", message);
                 match message {
                 | In::Propose(proposal) => self.respond_propose(proposal),
                 | In::Preempt(ballot) => self.respond_preempt(ballot),

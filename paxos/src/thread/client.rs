@@ -31,20 +31,23 @@ impl<S: state::State> Connecting<S> {
         }
     }
 
-    pub async fn run(mut self) -> Result<Client<S>, Box<std::error::Error + 'static>> {
+    pub async fn run(mut self) -> Client<S> {
         loop {
             while let Some(Ok(message)) = await!(self.client_rx.next()) {
                 let client_id = message.client_id();
                 let (tx, rx) = mpsc::unbounded();
                 self.shared_tx.write().connect_client(client_id.clone(), tx);
-                return Ok(Client {
+                self.replica_tx.unbounded_send(replica::In::Request(message))
+                    .expect("[INTERNAL ERROR]: failed to send to replica");
+                debug!("connected to {:?}", client_id);
+                return Client {
                     client_id,
                     client_rx: self.client_rx,
                     client_tx: self.client_tx,
                     replica_tx: self.replica_tx,
                     shared_tx: self.shared_tx,
                     rx,
-                })
+                }
             }
         }
     }
@@ -63,11 +66,13 @@ impl<S: state::State> Client<S> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.client_rx.next()) {
+                trace!("received command {:?}", message);
                 self.replica_tx.unbounded_send(replica::In::Request(message))
                     .expect("[INTERNAL ERROR]: failed to send to replica")
             }
 
             while let Some(Ok(message)) = await!(self.rx.next()) {
+                trace!("sending message {:?} to {:?}", message, self.client_id);
                 if let Err(_) = WriteBincode::new(&mut self.client_tx)
                     .send(message)
                     .wait() {
@@ -80,6 +85,7 @@ impl<S: state::State> Client<S> {
 
 impl<S: state::State> Drop for Client<S> {
     fn drop(&mut self) {
+        debug!("disconnected from {:?}", self.client_id);
         self.shared_tx.write().disconnect_client(&self.client_id);
     }
 }

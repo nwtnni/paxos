@@ -57,6 +57,7 @@ impl<S: state::State> Connecting<S> {
                 | In::Ping(peer_id) => {
                     let (tx, rx) = mpsc::unbounded();
                     self.shared_tx.write().connect_peer(peer_id, tx);
+                    debug!("connected to {}", peer_id);
                     return Peer {
                         self_id: self.self_id,
                         peer_id,
@@ -97,10 +98,12 @@ impl<S: state::State> Peer<S> {
             }
 
             while let Some(Ok(message)) = await!(self.peer_rx.next()) {
+                trace!("received message {:?}", message);
                 self.respond_incoming(message);
             }
 
             while let Some(Ok(message)) = await!(self.rx.next()) {
+                trace!("sending message {:?}", message);
                 if let Err(_) = self.send(message) {
                     return
                 }
@@ -121,10 +124,14 @@ impl<S: state::State> Peer<S> {
                 .expect("[INTERNAL ERROR]: failed to send to acceptor");
         }
         | In::P1B(p1b) => {
-            self.shared_tx.read().send_scout(p1b);
+            self.shared_tx
+                .read()
+                .send_scout(p1b);
         }
         | In::P2B(c_id, p2b) => {
-            self.shared_tx.read().send_commander(c_id, p2b);
+            self.shared_tx
+                .read()
+                .send_commander(c_id, p2b);
         }
         | In::Ping(_) => (),
         }
@@ -141,6 +148,7 @@ impl<S: state::State> Peer<S> {
 
 impl<S: state::State> Drop for Peer<S> {
     fn drop(&mut self) {
+        debug!("disconnected from {}", self.peer_id);
         self.shared_tx.write().disconnect_peer(self.peer_id);
     }
 }

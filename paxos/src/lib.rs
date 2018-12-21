@@ -1,7 +1,7 @@
 #![feature(await_macro, async_await, futures_api, pin)]
 
-#[macro_use]
-extern crate derivative;
+#[macro_use] extern crate derivative;
+#[macro_use] extern crate log;
 
 mod config;
 mod message;

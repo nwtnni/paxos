@@ -80,8 +80,8 @@ impl<S: state::State> State<S> {
 
     pub fn send_commander(&self, c_id: message::CommanderID, message: commander::In) {
         if let Some(tx) = self.commander_txs.get(&c_id) {
-            tx.unbounded_send(message)
-                .expect("[INTERNAL ERROR]: failed to send to commander");
+            // Commander may have received majority and dropped receiving end
+            tx.unbounded_send(message).ok();
         }
     }
 
@@ -91,8 +91,8 @@ impl<S: state::State> State<S> {
     }
 
     pub fn send_scout(&self, message: scout::In<S::Command>) {
-        self.scout_tx.unbounded_send(message)
-            .expect("[INTERNAL ERROR]: failed to send to replica");
+        // Scout might have received a majority and dropped receiving end
+        self.scout_tx.unbounded_send(message).ok();
     }
 
     pub fn send_client(&self, id: <S::Command as state::Command>::ClientID, message: S::Response) {

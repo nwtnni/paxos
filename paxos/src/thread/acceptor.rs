@@ -1,5 +1,4 @@
 use hashbrown::HashMap as Map;
-
 use tokio::prelude::*;
 
 use crate::message;
@@ -37,6 +36,7 @@ impl<S: state::State> Acceptor<S> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.rx.next()) {
+                trace!("received message {:?}", message);
                 match message {
                 | In::P1A(m) => self.send_p1a(m),
                 | In::P2A(c_id, m) => self.send_p2a(c_id, m),
@@ -54,6 +54,7 @@ impl<S: state::State> Acceptor<S> {
                 .cloned()
                 .collect(),
         });
+        trace!("sending message {:?} to {}", p1b, ballot.l_id);
         self.shared_tx.read().send(ballot.l_id, p1b)
     }
 
@@ -69,6 +70,7 @@ impl<S: state::State> Acceptor<S> {
                 b_id: self.ballot,
             }
         );
+        trace!("sending message {:?} to {}", p2b, pvalue.b_id.l_id);
         self.shared_tx.read().send(pvalue.b_id.l_id, p2b)
     }
 }

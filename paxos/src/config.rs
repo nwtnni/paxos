@@ -110,10 +110,8 @@ impl<S: state::State> Config<S> {
                     replica_tx.clone(),
                     shared.clone(),
                 );
-
-                if let Ok(client) = await!(connecting.run()) {
-                    tokio::spawn_async(client.run());
-                }
+                let client = await!(connecting.run());
+                tokio::spawn_async(client.run());
             }
         });
 

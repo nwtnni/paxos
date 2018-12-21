@@ -38,12 +38,14 @@ pub trait Command: Send
 
 /// Result of applying an operation to a state machine
 pub trait Response: Send
+    + std::fmt::Debug
     + serde::Serialize
     + serde::de::DeserializeOwned
 {
 }
 
 impl<T> Response for T where T: Send
+    + std::fmt::Debug
     + serde::Serialize
     + serde::de::DeserializeOwned
 {

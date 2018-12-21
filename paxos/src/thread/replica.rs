@@ -47,6 +47,7 @@ impl<S: state::State> Replica<S> {
     pub async fn run(mut self) {
         loop {
             while let Some(Ok(message)) = await!(self.rx.next()) {
+                trace!("received message {:?}", message);
                 match message {
                 | In::Request(command) => self.respond_request(command),
                 | In::Decision(proposal) => self.respond_decision(proposal),
@@ -111,6 +112,7 @@ impl<S: state::State> Replica<S> {
                 return
             }
         }
+        info!("executing {:?} in slot {}", c, self.slot);
         let result = self.state.execute(self.slot, c); 
         self.slot += 1;
         self.shared_tx
