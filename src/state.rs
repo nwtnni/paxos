@@ -34,5 +34,5 @@ pub trait Response: Send
 pub trait State: Default + Send + 'static {
     type Command: Command;
     type Response: Response;
-    fn execute(&mut self, command: Self::Command) -> Self::Response;
+    fn execute(&mut self, slot: usize, command: Self::Command) -> Self::Response;
 }

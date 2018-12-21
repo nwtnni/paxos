@@ -110,7 +110,7 @@ impl<S: state::State> Replica<S> {
                 return
             }
         }
-        let result = self.state.execute(c); 
+        let result = self.state.execute(self.slot, c); 
         self.slot += 1;
         self.shared_tx
             .read()
