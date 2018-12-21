@@ -2,11 +2,12 @@ use futures::sync::mpsc;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 use tokio_serde_bincode::WriteBincode;
-use tokio::{codec, net};
+use tokio::net;
 
 use crate::message;
 use crate::shared::Shared;
 use crate::state;
+use crate::socket;
 use crate::thread::*;
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
@@ -22,8 +23,8 @@ pub enum In<C: state::Command> {
 
 pub struct Connecting<S: state::State> {
     self_id: usize,
-    peer_rx: SocketRx<In<S::Command>>,
-    peer_tx: SocketTx,
+    peer_rx: socket::Rx<In<S::Command>>,
+    peer_tx: socket::Tx,
     acceptor_tx: Tx<acceptor::In<S::Command>>,
     shared_tx: Shared<S>,
     timeout: std::time::Duration,
@@ -38,15 +39,7 @@ impl<S: state::State> Connecting<S> {
         shared_tx: Shared<S>,
         timeout: std::time::Duration,
     ) -> Self {
-        let (peer_rx, peer_tx) = stream.split();
-        let peer_rx = ReadBincode::new(
-            codec::length_delimited::Builder::new()
-                .new_read(peer_rx)
-                .from_err::<bincode::Error>()
-        );
-        let peer_tx = codec::length_delimited::Builder::new()
-            .new_write(peer_tx)
-            .sink_from_err::<bincode::Error>();
+        let (peer_rx, peer_tx) = socket::split(stream);
         Connecting {
             self_id,
             peer_rx,
@@ -86,15 +79,14 @@ pub struct Peer<S: state::State> {
     peer_id: usize,
     self_id: usize,
     rx: Rx<In<S::Command>>,
-    peer_rx: SocketRx<In<S::Command>>,
-    peer_tx: SocketTx,
+    peer_rx: socket::Rx<In<S::Command>>,
+    peer_tx: socket::Tx,
     acceptor_tx: Tx<acceptor::In<S::Command>>,
     shared_tx: Shared<S>,
     timeout: tokio::timer::Interval,
 }
 
 impl<S: state::State> Peer<S> {
-
     pub async fn run(mut self) {
         loop {
             // Drop connection to unresponsive peers

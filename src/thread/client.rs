@@ -1,17 +1,18 @@
 use futures::sync::mpsc;
-use tokio_serde_bincode::{ReadBincode, WriteBincode};
+use tokio_serde_bincode::WriteBincode;
 use tokio::prelude::*;
-use tokio::{codec, net};
+use tokio::net;
 
 use crate::shared;
+use crate::socket;
 use crate::state;
 use crate::state::{Command, Response};
-use crate::thread::{SocketRx, SocketTx, Rx, Tx, replica};
+use crate::thread::{Rx, Tx, replica};
 
 pub struct Connecting<S: state::State> {
     self_id: usize,
-    client_rx: SocketRx<S::Command>,
-    client_tx: SocketTx,
+    client_rx: socket::Rx<S::Command>,
+    client_tx: socket::Tx,
     replica_tx: Tx<replica::In<S::Command>>,
     shared_tx: shared::Shared<S>,
 }
@@ -23,15 +24,7 @@ impl<S: state::State> Connecting<S> {
         replica_tx: Tx<replica::In<S::Command>>,
         shared_tx: shared::Shared<S>,
     ) -> Self {
-        let (client_rx, client_tx) = stream.split();
-        let client_rx = ReadBincode::new(
-            codec::length_delimited::Builder::new()
-                .new_read(client_rx)
-                .from_err::<bincode::Error>()
-        );
-        let client_tx = codec::length_delimited::Builder::new()
-            .new_write(client_tx)
-            .sink_from_err::<bincode::Error>();
+        let (client_rx, client_tx) = socket::split(stream);
         Connecting {
             self_id,
             client_rx,
@@ -65,8 +58,8 @@ impl<S: state::State> Connecting<S> {
 
 pub struct Client<S: state::State> {
     client_id: <S::Command as state::Command>::ClientID,
-    client_rx: SocketRx<S::Command>,
-    client_tx: SocketTx,
+    client_rx: socket::Rx<S::Command>,
+    client_tx: socket::Tx,
     replica_tx: Tx<replica::In<S::Command>>,
     shared_tx: shared::Shared<S>,
     rx: Rx<S::Response>,
