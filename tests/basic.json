@@ -1,6 +1,8 @@
 [
     { "type": "Start", "id": 0, "port": 10000, "count": 1 },
+    { "type": "Sleep", "ms": 3000 },
     { "type": "Connect", "id": 0 },
     { "type": "Put", "id": 0, "message": "Hello, World!" },
+    { "type": "Sleep", "ms": 3000 },
     { "type": "Get", "id": 0 }
 ]

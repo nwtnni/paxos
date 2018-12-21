@@ -5,6 +5,7 @@ pub struct Execution(pub Vec<Command>);
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[derive(Debug)]
 pub enum Command {
     /// Start a replica with the given parameters
     Start {
@@ -38,4 +39,9 @@ pub enum Command {
     Crash {
         id: usize,
     },
+
+    /// Sleep the test harness for `ms` milliseconds
+    Sleep {
+        ms: u64,
+    }
 }

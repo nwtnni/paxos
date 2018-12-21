@@ -61,8 +61,10 @@ impl<S: state::State> Config<S> {
             .incoming();
 
         let shared_tx: shared::Shared<S> = shared::Shared::new(
+            self.id,
             scout_tx,
             replica_tx.clone(),
+            acceptor_tx.clone(),
         );
 
         let acceptor = thread::acceptor::Acceptor::new(

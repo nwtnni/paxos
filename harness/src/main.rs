@@ -48,6 +48,7 @@ async fn run() {
     let operations: Arc<atomic::AtomicUsize> = Arc::new(atomic::AtomicUsize::new(0));
 
     for command in execution.0 {
+        println!("Executing command {:?}", command);
         match command {
         | Command::Start { id, port, count } => {
             let child = std::process::Command::new(&opt.server)
@@ -56,16 +57,16 @@ async fn run() {
                 .args(&["-c", &count.to_string()])
                 .spawn()
                 .expect("[INTERNAL ERROR]: could not spawn server");
+            println!("child {:?}", child);
             servers.insert(id, child);
             ports.insert(id, port);
-            std::thread::sleep(std::time::Duration::from_secs(1));
         }
         | Command::Connect { id } => {
             let connection = format!("127.0.0.1:{}", ports[&id])
                 .parse::<std::net::SocketAddr>()
-                .map(|address| tokio::net::tcp::TcpStream::connect(&address))
+                .map(|address| std::net::TcpStream::connect(&address).unwrap())
+                .map(|stream| tokio::net::tcp::TcpStream::from_std(stream, &tokio::reactor::Handle::default()))
                 .unwrap()
-                .wait()
                 .expect("[INTERNAL ERROR]: could not connect to server");
             let (rx, tx) = socket::split(connection);
             readers.insert(id, rx);
@@ -124,6 +125,9 @@ async fn run() {
             if let Some(mut server) = servers.remove(&id) {
                 server.kill().ok();
             }
+        }
+        | Command::Sleep { ms } => {
+            std::thread::sleep(std::time::Duration::from_millis(ms))
         }
         }
     }
