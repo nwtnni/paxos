@@ -13,7 +13,7 @@ use crate::thread::{leader, peer, Tx, Rx};
 
 pub type In<I> = message::P1B<I>;
 
-pub struct Scout<I> {
+pub struct Scout<I: state::CommandID> {
     rx: Rx<In<I>>,
     leader_tx: Tx<leader::In<I>>,
     shared_tx: shared::Shared<I>,
@@ -24,7 +24,7 @@ pub struct Scout<I> {
     timeout: timer::Interval,
 }
 
-impl<I: state::Identifier> Scout<I> {
+impl<I: state::CommandID> Scout<I> {
     pub fn new(
         leader_tx: Tx<leader::In<I>>,
         shared_tx: shared::Shared<I>, 

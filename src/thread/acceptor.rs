@@ -15,7 +15,7 @@ pub enum In<I> {
 }
 
 #[derive(Debug)]
-pub struct Acceptor<I> {
+pub struct Acceptor<I: state::CommandID> {
     id: usize,
     ballot: message::BallotID,
     accepted: Map<usize, message::PValue<I>>,
@@ -23,7 +23,7 @@ pub struct Acceptor<I> {
     shared_tx: shared::Shared<I>,
 }
 
-impl<I: state::Identifier> Acceptor<I> {
+impl<I: state::CommandID> Acceptor<I> {
 
     pub fn new(id: usize, rx: Rx<In<I>>, shared_tx: shared::Shared<I>) -> Self {
         Acceptor {

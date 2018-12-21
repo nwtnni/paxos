@@ -6,7 +6,7 @@ use crate::shared;
 use crate::state;
 use crate::thread::{SocketRx, SocketTx, Rx, Tx, replica};
 
-type In<C> = message::Proposal<C>;
+pub type In<C> = message::Proposal<C>;
 
 pub struct Client<C: state::Command> {
     socket_rx: SocketRx<In<C::ID>>,

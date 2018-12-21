@@ -13,7 +13,7 @@ pub type In = message::P2B;
 
 pub type ID = (message::BallotID, usize);
 
-pub struct Commander<I: Clone> {
+pub struct Commander<I: state::CommandID> {
     id: ID,
     rx: Rx<In>,
     leader_tx: Tx<leader::In<I>>,
@@ -24,7 +24,7 @@ pub struct Commander<I: Clone> {
     timeout: timer::Interval,
 }
 
-impl<I: state::Identifier> Commander<I> {
+impl<I: state::CommandID> Commander<I> {
     pub fn new(
         leader_tx: Tx<leader::In<I>>,
         shared_tx: shared::Shared<I>,
@@ -110,7 +110,7 @@ impl<I: state::Identifier> Commander<I> {
     }
 }
 
-impl<I: Clone> Drop for Commander<I> {
+impl<I: state::CommandID> Drop for Commander<I> {
     fn drop(&mut self) {
         self.shared_tx.write().disconnect_commander(self.id);
     }

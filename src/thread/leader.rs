@@ -16,7 +16,7 @@ pub enum In<I> {
     Adopt(Vec<message::PValue<I>>),
 }
 
-pub struct Leader<I> {
+pub struct Leader<I: state::CommandID> {
     id: usize,
     count: usize,
     self_rx: Rx<In<I>>,
@@ -28,7 +28,7 @@ pub struct Leader<I> {
     proposals: Map<I, usize>,
 }
 
-impl<I: state::Identifier> Leader<I> {
+impl<I: state::CommandID> Leader<I> {
 
     pub fn new(id: usize, count: usize, self_rx: Rx<In<I>>, self_tx: Tx<In<I>>, shared_tx: shared::Shared<I>) -> Self {
         Leader {

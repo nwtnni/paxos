@@ -3,12 +3,13 @@ use std::sync::Arc;
 use hashbrown::HashMap as Map;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::thread::{commander, peer, replica, scout, Tx};
+use crate::state;
+use crate::thread::{client, commander, peer, replica, scout, Tx};
 
 #[derive(Debug, Clone)]
-pub struct Shared<I>(Arc<RwLock<State<I>>>);
+pub struct Shared<I: state::CommandID>(Arc<RwLock<State<I>>>);
 
-impl<I> Shared<I> {
+impl<I: state::CommandID> Shared<I> {
     pub fn new(scout_tx: Tx<scout::In<I>>, replica_tx: Tx<replica::In<I>>) -> Self {
         Shared(Arc::new(RwLock::new(State::new(scout_tx, replica_tx))))
     }
@@ -23,17 +24,19 @@ impl<I> Shared<I> {
 }
 
 #[derive(Debug)]
-pub struct State<I> {
+pub struct State<I: state::CommandID> {
     peer_txs: Map<usize, Tx<peer::In<I>>>,
+    client_txs: Map<I::Client, Tx<client::In<I>>>,
     commander_txs: Map<commander::ID, Tx<commander::In>>,
     scout_tx: Tx<scout::In<I>>,
     replica_tx: Tx<replica::In<I>>,
 }
 
-impl<I> State<I> {
+impl<I: state::CommandID> State<I> {
     pub fn new(scout_tx: Tx<scout::In<I>>, replica_tx: Tx<replica::In<I>>) -> Self {
         State {
             peer_txs: Map::default(),
+            client_txs: Map::default(),
             commander_txs: Map::default(),
             scout_tx,
             replica_tx,
@@ -86,9 +89,7 @@ impl<I> State<I> {
             let _ = tx.unbounded_send(message);
         }
     }
-}
 
-impl<I: Clone> State<I> {
     pub fn broadcast(&self, message: peer::In<I>) {
         for id in self.peer_txs.keys() {
             self.send(*id, message.clone());

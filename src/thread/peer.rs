@@ -18,7 +18,7 @@ pub enum In<I> {
     Ping(usize),
 }
 
-pub struct Connecting<I> {
+pub struct Connecting<I: state::CommandID> {
     self_id: usize,
     peer_rx: SocketRx<In<I>>,
     peer_tx: SocketTx,
@@ -26,7 +26,7 @@ pub struct Connecting<I> {
     shared_tx: Shared<I>,
 }
 
-impl<I: state::Identifier> Connecting<I> {
+impl<I: state::CommandID> Connecting<I> {
 
     pub fn new(
         self_id: usize,
@@ -77,7 +77,7 @@ impl<I: state::Identifier> Connecting<I> {
     }
 }
 
-pub struct Peer<I> {
+pub struct Peer<I: state::CommandID> {
     peer_id: usize,
     self_id: usize,
     rx: Rx<In<I>>,
@@ -88,7 +88,7 @@ pub struct Peer<I> {
     ping: tokio::timer::Interval,
 }
 
-impl<I: state::Identifier> Peer<I> {
+impl<I: state::CommandID> Peer<I> {
 
     pub async fn run(mut self) {
         loop {
@@ -142,7 +142,7 @@ impl<I: state::Identifier> Peer<I> {
     }
 }
 
-impl<I> Drop for Peer<I> {
+impl<I: state::CommandID> Drop for Peer<I> {
     fn drop(&mut self) {
         self.shared_tx.write().disconnect_peer(self.peer_id);
     }
