@@ -22,13 +22,15 @@ struct Opt {
     file: std::path::PathBuf,
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+async fn run() {
 
     let opt = Opt::from_args();
 
     // Test execution
     let execution: Execution = std::fs::File::open(opt.file)
-        .map(serde_json::from_reader)??;
+        .map(serde_json::from_reader)
+        .expect("[INTERNAL ERROR]: could not find file")
+        .expect("[INTERNAL ERROR]: could not parse test");
 
     // TCP incoming connections
     let mut readers: Map<usize, socket::Rx> = Map::default();
@@ -52,15 +54,19 @@ fn main() -> Result<(), Box<std::error::Error>> {
                 .args(&["-i", &id.to_string()])
                 .args(&["-p", &port.to_string()])
                 .args(&["-c", &count.to_string()])
-                .spawn()?;
+                .spawn()
+                .expect("[INTERNAL ERROR]: could not spawn server");
             servers.insert(id, child);
             ports.insert(id, port);
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
         | Command::Connect { id } => {
             let connection = format!("127.0.0.1:{}", ports[&id])
                 .parse::<std::net::SocketAddr>()
-                .map(|address| tokio::net::tcp::TcpStream::connect(&address))?
-                .wait()?;
+                .map(|address| tokio::net::tcp::TcpStream::connect(&address))
+                .unwrap()
+                .wait()
+                .expect("[INTERNAL ERROR]: could not connect to server");
             let (rx, tx) = socket::split(connection);
             readers.insert(id, rx);
             writers.insert(id, Arc::new(Mutex::new(tx)));
@@ -121,6 +127,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
         }
         }
     }
+}
 
-    Ok(())
+fn main() {
+    tokio::run_async(run());
 }

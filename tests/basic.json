@@ -1,0 +1,6 @@
+[
+    { "type": "Start", "id": 0, "port": 10000, "count": 1 },
+    { "type": "Connect", "id": 0 },
+    { "type": "Put", "id": 0, "message": "Hello, World!" },
+    { "type": "Get", "id": 0 }
+]
