@@ -9,7 +9,7 @@ use crate::thread;
 const DEFAULT_PORT: usize = 20000;
 
 #[derive(Copy, Clone, Debug)]
-pub struct Config<C, R, S> {
+pub struct Config<S> {
     /// Unique replica ID
     id: usize,
 
@@ -19,16 +19,17 @@ pub struct Config<C, R, S> {
     /// Total number of replicas
     count: usize,
 
-    _marker: marker::PhantomData<(C, R, S)>,     
+    /// Initial state
+    initial: S,
 }
 
-impl<C: state::Command, R: state::Response, S: state::State<C, R>> Config<C, R, S> {
-    pub fn new(id: usize, port: usize, count: usize) -> Self {
+impl<S: state::State> Config<S> {
+    pub fn new(id: usize, port: usize, count: usize, initial: S) -> Self {
         Config {
             id,
             port,
             count,
-            _marker: Default::default(),
+            initial,
         }
     }
 
@@ -43,7 +44,7 @@ impl<C: state::Command, R: state::Response, S: state::State<C, R>> Config<C, R, 
             .parse::<std::net::SocketAddr>()
             .unwrap();
 
-        let shared_tx: shared::Shared<C::ID> = shared::Shared::new(
+        let shared_tx: shared::Shared<<S::Command as state::Command>::ID> = shared::Shared::new(
             scout_tx,
             replica_tx
         );

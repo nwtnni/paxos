@@ -1,8 +1,6 @@
-use std::marker;
 use std::collections::HashMap as Map;
 
 use bimap::BiMap;
-use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio_serde_bincode::{ReadBincode, WriteBincode};
 use tokio::{codec, net};
@@ -10,29 +8,29 @@ use tokio::{codec, net};
 use crate::message;
 use crate::shared;
 use crate::state;
+use crate::state::Command;
 use crate::thread::*;
 
 pub type In<C> = message::Proposal<C>;
 
-pub struct Replica<C: state::Command, R, S> {
-    client_rx: SocketRx<C>,
+pub struct Replica<S: state::State> {
+    client_rx: SocketRx<S::Command>,
     client_tx: SocketTx,
-    leader_tx: Tx<leader::In<C::ID>>,
-    rx: Rx<In<C::ID>>,
+    leader_tx: Tx<leader::In<<S::Command as state::Command>::ID>>,
+    rx: Rx<In<<S::Command as state::Command>::ID>>,
     state: S,
     slot: usize,
-    proposals: BiMap<C::ID, usize>,
-    decisions: BiMap<C::ID, usize>,
-    commands: Map<C::ID, C>,
-    _marker: marker::PhantomData<R>,
+    proposals: BiMap<<S::Command as state::Command>::ID, usize>,
+    decisions: BiMap<<S::Command as state::Command>::ID, usize>,
+    commands: Map<<S::Command as state::Command>::ID, S::Command>,
 }
 
-impl<C: state::Command, R: state::Response, S: state::State<C, R>> Replica<C, R, S> {
+impl<S: state::State> Replica<S> {
     pub fn new(
         client: net::tcp::TcpStream,   
-        leader_tx: Tx<leader::In<C::ID>>,
-        shared_tx: shared::Shared<C::ID>,
-        rx: Rx<In<C::ID>>,
+        leader_tx: Tx<leader::In<<S::Command as state::Command>::ID>>,
+        shared_tx: shared::Shared<<S::Command as state::Command>::ID>,
+        rx: Rx<In<<S::Command as state::Command>::ID>>,
         state: S,
     ) -> Self {
         let (client_rx, client_tx) = client.split();
@@ -57,7 +55,6 @@ impl<C: state::Command, R: state::Response, S: state::State<C, R>> Replica<C, R,
             proposals: BiMap::default(),
             decisions: BiMap::default(),
             commands: Map::default(),
-            _marker: Default::default(),
         }
     }
 
@@ -73,13 +70,13 @@ impl<C: state::Command, R: state::Response, S: state::State<C, R>> Replica<C, R,
         }
     }
 
-    fn respond_request(&mut self, request: C) {
+    fn respond_request(&mut self, request: S::Command) {
         let c_id = request.id().clone();
         self.commands.insert(c_id.clone(), request);
         self.propose(c_id);
     }
 
-    fn respond_decision(&mut self, decision: message::Proposal<C::ID>) {
+    fn respond_decision(&mut self, decision: message::Proposal<<S::Command as state::Command>::ID>) {
         self.decisions.insert(decision.c_id, decision.s_id);
 
         while let Some(c1) = self.decisions.get_by_right(&self.slot).cloned() {
@@ -94,7 +91,7 @@ impl<C: state::Command, R: state::Response, S: state::State<C, R>> Replica<C, R,
         }
     }
 
-    fn propose(&mut self, c_id: C::ID) {
+    fn propose(&mut self, c_id: <S::Command as state::Command>::ID) {
         if self.decisions.contains_left(&c_id) { return }
 
         let next = 1 + std::cmp::max(
@@ -113,7 +110,7 @@ impl<C: state::Command, R: state::Response, S: state::State<C, R>> Replica<C, R,
             .expect("[INTERNAL ERROR]: failed to send proposal");
     }
 
-    fn perform(&mut self, c: C) {
+    fn perform(&mut self, c: S::Command) {
         if let Some(s) = self.decisions.get_by_left(&c.id()) {
             if *s < self.slot {
                 self.slot += 1;
