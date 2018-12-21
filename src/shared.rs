@@ -40,6 +40,10 @@ impl<I> State<I> {
         }
     }
 
+    pub fn replica_tx(&self) -> &Tx<replica::In<I>> {
+        &self.replica_tx
+    }
+
     pub fn connect_peer(&mut self, id: usize, tx: Tx<peer::In<I>>) {
         self.peer_txs.insert(id, tx);
     }
@@ -67,13 +71,13 @@ impl<I> State<I> {
         }
     }
 
-    pub fn send_scout(&self, message: scout::In<I>) {
-        self.scout_tx.unbounded_send(message)
+    pub fn send_replica(&self, message: replica::In<I>) {
+        self.replica_tx.unbounded_send(message)
             .expect("[INTERNAL ERROR]: failed to send to replica");
     }
 
-    pub fn send_replica(&self, message: replica::In<I>) {
-        self.replica_tx.unbounded_send(message)
+    pub fn send_scout(&self, message: scout::In<I>) {
+        self.scout_tx.unbounded_send(message)
             .expect("[INTERNAL ERROR]: failed to send to replica");
     }
 

@@ -12,19 +12,23 @@ pub trait Identifier: std::fmt::Debug
 {
 }
 
-#[rustfmt::skip]
+pub trait CommandID: Identifier {
+    type Client: Identifier;
+    type Command: Identifier;
+    fn client_id(&self) -> Self::Client;
+}
+
 pub trait Command: std::fmt::Debug
     + std::marker::Unpin
     + serde::Serialize
     + serde::de::DeserializeOwned
     + Clone
 {
-    type ID: Identifier;
+    type ID: CommandID;
 
     fn id(&self) -> Self::ID;
 }
 
-#[rustfmt::skip]
 pub trait Response: std::fmt::Debug
     + serde::Serialize
     + serde::de::DeserializeOwned
