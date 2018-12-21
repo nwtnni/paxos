@@ -46,14 +46,14 @@ impl<S: state::State> Config<S> {
         let (scout_tx, _) = mpsc::unbounded();
         let (replica_tx, replica_rx) = mpsc::unbounded();
 
-        let mut internal_port = format!("localhost:{}", self.id + INTERNAL_PORT)
+        let mut internal_port = format!("127.0.0.1:{}", self.id + INTERNAL_PORT)
             .parse::<std::net::SocketAddr>()
             .map(|addr| tokio::net::tcp::TcpListener::bind(&addr))
             .expect("[INTERNAL ERROR]: invalid socket address")
             .expect("[INTERNAL ERROR]: failed to bind to socket")
             .incoming();
 
-        let mut external_port = format!("localhost:{}", self.port)
+        let mut external_port = format!("127.0.0.1:{}", self.port)
             .parse::<std::net::SocketAddr>()
             .map(|addr| tokio::net::tcp::TcpListener::bind(&addr))
             .expect("[INTERNAL ERROR]: invalid socket address")

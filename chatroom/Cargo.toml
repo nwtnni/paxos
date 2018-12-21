@@ -8,3 +8,6 @@ edition = "2018"
 paxos = { path = "../paxos" }
 serde = "1.0.82"
 serde_derive = "1.0.82"
+structopt = "0.2.14"
+tokio = "0.1.13"
+tokio-async-await = "0.1.4"
