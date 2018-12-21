@@ -4,9 +4,9 @@ use paxos;
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
 pub struct Command {
-    client_id: usize,
-    local_id: usize,
-    mode: Mode,
+    pub client_id: usize,
+    pub local_id: usize,
+    pub mode: Mode,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -19,15 +19,13 @@ pub enum Mode {
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
 pub enum Response {
-    Connected(usize),
-    Received(usize),
     Messages(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug, Default)]
 pub struct State {
-    messages: Vec<String>,
+    pub messages: Vec<String>,
 }
 
 impl paxos::Command for Command {
@@ -44,13 +42,15 @@ impl paxos::Command for Command {
 impl paxos::State for State {
     type Command = Command;
     type Response = Response;
-    fn execute(&mut self, slot: usize, command: Self::Command) -> Self::Response {
+    fn execute(&mut self, slot: usize, command: Self::Command) -> Option<Self::Response> {
         match command.mode {
-        | Mode::Get => Response::Messages(self.messages.clone()),
+        | Mode::Get => {
+            Some(Response::Messages(self.messages.clone()))
+        }
         | Mode::Put(message) => {
             self.messages.push(message);
-            Response::Received(slot)
-        }
+            None
+        },
         }
     }
 }

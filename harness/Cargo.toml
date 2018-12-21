@@ -5,7 +5,12 @@ authors = ["Newton Ni <nwtnni@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-paxos = { path = "../paxos" }
+chatroom = { path = "../chatroom" }
 serde_json = "1.0.33"
 serde_derive = "1.0.82"
 serde = "1.0.82"
+structopt = "0.2.14"
+tokio-serde-bincode = "0.2.1"
+bincode = "1.0.1"
+tokio = "0.1.13"
+futures = "0.1.25"

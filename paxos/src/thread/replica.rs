@@ -113,10 +113,11 @@ impl<S: state::State> Replica<S> {
             }
         }
         info!("executing {:?} in slot {}", c, self.slot);
-        let result = self.state.execute(self.slot, c); 
+        if let Some(result) = self.state.execute(self.slot, c) {
+            self.shared_tx
+                .read()
+                .send_client(client_id, result);
+        }
         self.slot += 1;
-        self.shared_tx
-            .read()
-            .send_client(client_id, result);
     }
 }

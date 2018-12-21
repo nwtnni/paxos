@@ -55,5 +55,5 @@ impl<T> Response for T where T: Send
 pub trait State: Default + Send + 'static {
     type Command: Command;
     type Response: Response;
-    fn execute(&mut self, slot: usize, command: Self::Command) -> Self::Response;
+    fn execute(&mut self, slot: usize, command: Self::Command) -> Option<Self::Response>;
 }

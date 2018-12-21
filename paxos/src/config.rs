@@ -5,7 +5,7 @@ use crate::shared;
 use crate::state;
 use crate::thread;
 
-const INTERNAL_PORT: usize = 20000;
+const INTERNAL_PORT: usize = 25000;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Config<S> {
