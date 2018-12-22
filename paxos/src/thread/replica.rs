@@ -44,19 +44,6 @@ impl<S: state::State> Replica<S> {
         }
     }
 
-    pub async fn run(mut self) {
-        info!("starting...");
-        loop {
-            while let Some(Ok(message)) = await!(self.rx.next()) {
-                trace!("received message {:?}", message);
-                match message {
-                | In::Request(command) => self.respond_request(command),
-                | In::Decision(proposal) => self.respond_decision(proposal),
-                }
-            }
-        }
-    }
-
     fn respond_request(&mut self, command: S::Command) {
         let c_id = message::CommandID {
             c_id: command.client_id(),
@@ -120,5 +107,20 @@ impl<S: state::State> Replica<S> {
                 .send_client(client_id, result);
         }
         self.slot += 1;
+    }
+}
+
+impl<S: state::State> Future for Replica<S> {
+    type Item = ();
+    type Error = ();
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+        while let Async::Ready(Some(message)) = self.rx.poll()? {
+            trace!("received message {:?}", message);
+            match message {
+            | In::Request(command) => self.respond_request(command),
+            | In::Decision(proposal) => self.respond_decision(proposal),
+            }
+        }
+        Ok(Async::NotReady)
     }
 }
