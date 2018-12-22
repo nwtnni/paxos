@@ -137,7 +137,7 @@ impl<S: state::State> Leader<S> {
             self.backoff,
             self.timeout,
         );
-        tokio::spawn_async(scout.run());
+        tokio::spawn(scout);
     }
 }
 
