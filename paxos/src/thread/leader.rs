@@ -138,7 +138,7 @@ impl<S: state::State> Leader<S> {
             self.count,
             self.timeout,
         );
-        tokio::spawn_async(commander.run());
+        tokio::spawn(commander);
     }
 
     fn spawn_scout(&mut self) {

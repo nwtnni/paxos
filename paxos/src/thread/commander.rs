@@ -50,40 +50,6 @@ impl<S: state::State> Commander<S> {
         }
     }
 
-    pub async fn run(mut self) {
-        info!("starting for {:?}...", self.pvalue);
-        'outer: loop {
-
-            // Narrowcast P2A to acceptors who haven't responded
-            if let Some(_) = await!(self.timeout.next()) {
-                self.send_p2a();
-            }
-
-            // Respond to incoming P2B messages
-            if let Some(Ok(p2b)) = await!(self.rx.next()) {
-
-                // Commander has not been preempted
-                if p2b.b_id == self.pvalue.b_id {
-
-                    self.waiting.remove(&p2b.a_id);
-
-                    // Notify leader that we've achieved a majority
-                    if self.waiting.len() <= self.minority {
-                        self.send_decide();
-                        break 'outer
-                    }
-                }
-
-                // Notify leader that we've been preempted
-                else {
-                    debug_assert!(p2b.b_id > self.pvalue.b_id);
-                    self.send_preempt(p2b.b_id);
-                    break 'outer
-                }
-            }
-        }
-    }
-
     fn send_p2a(&self) {
         let p2a = peer::In::P2A(
             self.id,
@@ -94,7 +60,7 @@ impl<S: state::State> Commander<S> {
             .narrowcast(&self.waiting, p2a);
     }
 
-    fn send_decide(self) {
+    fn send_decide(&self) {
         let decide = message::Proposal {
             s_id: self.pvalue.s_id,
             c_id: self.pvalue.c_id.clone(),
@@ -105,12 +71,54 @@ impl<S: state::State> Commander<S> {
             .send_replica(replica::In::Decision(decide));
     }
 
-    fn send_preempt(self, b_id: message::BallotID) {
+    fn send_preempt(&self, b_id: message::BallotID) {
         let preempt = leader::In::Preempt::<S::Command>(b_id);
         debug!("{:?} preempted", self.pvalue);
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempted");
+    }
+}
+
+impl<S: state::State> Future for Commander<S> {
+    type Item = ();
+    type Error = ();
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+
+        // Narrowcast P2A to acceptors who haven't responded
+        while let Async::Ready(Some(_)) = self.timeout
+            .poll()
+            .map_err(|_| ())?
+        {
+            self.send_p2a();
+        }
+
+        // Respond to incoming P2B messages
+        while let Async::Ready(Some(p2b)) = self.rx
+            .poll()
+            .map_err(|_| ())?
+        {
+            // Commander has not been preempted
+            if p2b.b_id == self.pvalue.b_id {
+
+                self.waiting.remove(&p2b.a_id);
+
+                // Notify leader that we've achieved a majority
+                if self.waiting.len() <= self.minority {
+                    self.send_decide();
+                    return Ok(Async::Ready(()))
+                }
+            }
+
+            // Notify leader that we've been preempted
+            else {
+                debug_assert!(p2b.b_id > self.pvalue.b_id);
+                self.send_preempt(p2b.b_id);
+                return Ok(Async::Ready(()))
+            }
+        }
+
+        Ok(Async::NotReady)
     }
 }
 
