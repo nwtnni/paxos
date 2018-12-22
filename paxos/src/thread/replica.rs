@@ -45,6 +45,7 @@ impl<S: state::State> Replica<S> {
     }
 
     pub async fn run(mut self) {
+        info!("starting...");
         loop {
             while let Some(Ok(message)) = await!(self.rx.next()) {
                 trace!("received message {:?}", message);

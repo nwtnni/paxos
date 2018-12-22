@@ -38,7 +38,6 @@ impl<S: state::State> Commander<S> {
             s_id: pvalue.s_id,
         };
         shared_tx.write().connect_commander(id, self_tx);
-        debug!("spawning for {:?}", pvalue);
         Commander {
             id,
             rx: self_rx,
@@ -52,15 +51,16 @@ impl<S: state::State> Commander<S> {
     }
 
     pub async fn run(mut self) {
+        info!("starting for {:?}...", self.pvalue);
         'outer: loop {
 
             // Narrowcast P2A to acceptors who haven't responded
-            while let Some(_) = await!(self.timeout.next()) {
+            if let Some(_) = await!(self.timeout.next()) {
                 self.send_p2a();
             }
 
             // Respond to incoming P2B messages
-            while let Some(Ok(p2b)) = await!(self.rx.next()) {
+            if let Some(Ok(p2b)) = await!(self.rx.next()) {
 
                 // Commander has not been preempted
                 if p2b.b_id == self.pvalue.b_id {

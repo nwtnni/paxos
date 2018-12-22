@@ -115,6 +115,7 @@ async fn run() {
                     local_id,
                     mode: chatroom::Mode::Put(message),
                 };
+                println!("writing {:?}", command);
                 WriteBincode::new(&mut *writer.lock().unwrap())
                     .send(command)
                     .wait()

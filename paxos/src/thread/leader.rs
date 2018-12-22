@@ -57,8 +57,10 @@ impl<S: state::State> Leader<S> {
     }
 
     pub async fn run(mut self) {
+        info!("starting...");
+        self.spawn_scout();
         loop {
-            while let Some(Ok(message)) = await!(self.self_rx.next()) {
+            if let Some(Ok(message)) = await!(self.self_rx.next()) {
                 trace!("received message {:?}", message);
                 match message {
                 | In::Propose(proposal) => self.respond_propose(proposal),
@@ -136,9 +138,7 @@ impl<S: state::State> Leader<S> {
             self.count,
             self.timeout,
         );
-        tokio::spawn_async(async move {
-            commander.run();
-        })
+        tokio::spawn_async(commander.run());
     }
 
     fn spawn_scout(&mut self) {
@@ -150,8 +150,6 @@ impl<S: state::State> Leader<S> {
             self.backoff,
             self.timeout,
         );
-        tokio::spawn_async(async move {
-            scout.run();
-        })
+        tokio::spawn_async(scout.run());
     }
 }

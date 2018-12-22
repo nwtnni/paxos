@@ -41,7 +41,6 @@ impl<S: state::State> Scout<S> {
         let pvalues = Set::default();
         let (self_tx, self_rx) = mpsc::unbounded();
         shared_tx.write().replace_scout(self_tx);
-        debug!("spawning for {:?}", ballot);
         Scout {
             rx: self_rx,
             leader_tx,
@@ -55,15 +54,17 @@ impl<S: state::State> Scout<S> {
     }
 
     pub async fn run(mut self) {
+        info!("starting for {:?}", self.ballot);
         'outer: loop {
 
             // Narrowcast P1A to acceptors who haven't responded
-            while let Some(Ok(_)) = await!(self.timeout.next()) {
+            if let Some(Ok(_)) = await!(self.timeout.next()) {
                 self.send_p1a();
             }
 
             // Respond to incoming P1B messages
-            while let Some(Ok(p1b)) = await!(self.rx.next()) {
+            if let Some(Ok(p1b)) = await!(self.rx.next()) {
+                trace!("received message {:?}", p1b);
 
                 // Scout has not been preempted
                 if p1b.b_id == self.ballot {

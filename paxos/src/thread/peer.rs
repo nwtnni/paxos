@@ -91,18 +91,18 @@ impl<S: state::State> Peer<S> {
     pub async fn run(mut self) {
         loop {
             // Drop connection to unresponsive peers
-            while let Some(_) = await!(self.timeout.next()) {
+            if let Some(_) = await!(self.timeout.next()) {
                 if let Err(_) = self.send(In::Ping(self.self_id)) {
                     return
                 }
             }
 
-            while let Some(Ok(message)) = await!(self.peer_rx.next()) {
+            if let Some(Ok(message)) = await!(self.peer_rx.next()) {
                 trace!("received message {:?}", message);
                 self.respond_incoming(message);
             }
 
-            while let Some(Ok(message)) = await!(self.rx.next()) {
+            if let Some(Ok(message)) = await!(self.rx.next()) {
                 trace!("sending message {:?}", message);
                 if let Err(_) = self.send(message) {
                     return

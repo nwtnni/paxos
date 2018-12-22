@@ -33,13 +33,13 @@ impl<S: state::State> Connecting<S> {
 
     pub async fn run(mut self) -> Client<S> {
         loop {
-            while let Some(Ok(message)) = await!(self.client_rx.next()) {
+            if let Some(Ok(message)) = await!(self.client_rx.next()) {
                 let client_id = message.client_id();
+                debug!("connected to {:?}", client_id);
                 let (tx, rx) = mpsc::unbounded();
                 self.shared_tx.write().connect_client(client_id.clone(), tx);
                 self.replica_tx.unbounded_send(replica::In::Request(message))
                     .expect("[INTERNAL ERROR]: failed to send to replica");
-                debug!("connected to {:?}", client_id);
                 return Client {
                     client_id,
                     client_rx: self.client_rx,
@@ -65,13 +65,13 @@ pub struct Client<S: state::State> {
 impl<S: state::State> Client<S> {
     pub async fn run(mut self) {
         loop {
-            while let Some(Ok(message)) = await!(self.client_rx.next()) {
+            if let Some(Ok(message)) = await!(self.client_rx.next()) {
                 trace!("received command {:?}", message);
                 self.replica_tx.unbounded_send(replica::In::Request(message))
                     .expect("[INTERNAL ERROR]: failed to send to replica")
             }
 
-            while let Some(Ok(message)) = await!(self.rx.next()) {
+            if let Some(Ok(message)) = await!(self.rx.next()) {
                 trace!("sending message {:?} to {:?}", message, self.client_id);
                 if let Err(_) = WriteBincode::new(&mut self.client_tx)
                     .send(message)
