@@ -21,6 +21,21 @@ pub struct Acceptor<S: state::State> {
     shared_tx: shared::Shared<S>,
 }
 
+impl<S: state::State> Future for Acceptor<S> {
+    type Item = ();
+    type Error = ();
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+        while let Async::Ready(Some(message)) = self.rx.poll()? {
+            trace!("received message {:?}", message);
+            match message {
+            | In::P1A(m) => self.send_p1a(m),
+            | In::P2A(c_id, m) => self.send_p2a(c_id, m),
+            }
+        }
+        Ok(Async::NotReady)
+    }
+}
+
 impl<S: state::State> Acceptor<S> {
 
     pub fn new(id: usize, rx: Rx<In<S::Command>>, shared_tx: shared::Shared<S>) -> Self {
@@ -30,19 +45,6 @@ impl<S: state::State> Acceptor<S> {
             accepted: Map::default(),
             rx,
             shared_tx
-        }
-    }
-
-    pub async fn run(mut self) {
-        info!("starting...");
-        loop {
-            while let Some(Ok(message)) = await!(self.rx.next()) {
-                trace!("received message {:?}", message);
-                match message {
-                | In::P1A(m) => self.send_p1a(m),
-                | In::P2A(c_id, m) => self.send_p2a(c_id, m),
-                }
-            }
         }
     }
 

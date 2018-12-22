@@ -117,7 +117,7 @@ impl<S: state::State> Config<S> {
             }
         });
 
-        tokio::spawn_async(acceptor.run());
+        tokio::spawn(acceptor);
         tokio::spawn_async(replica.run());
         tokio::spawn_async(leader.run());
     }
