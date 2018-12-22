@@ -67,19 +67,19 @@ impl<S: state::State> Config<S> {
             acceptor_tx.clone(),
         );
 
-        let acceptor = thread::acceptor::Acceptor::new(
+        let acceptor_thread = thread::acceptor::Acceptor::new(
             self.id,
             acceptor_rx,
             shared_tx.clone(),
         );
 
-        let replica = thread::replica::Replica::new(
+        let replica_thread = thread::replica::Replica::new(
             leader_tx.clone(),
             shared_tx.clone(),
             replica_rx,
         );
 
-        let leader = thread::leader::Leader::new(
+        let leader_thread = thread::leader::Leader::new(
             self.id,
             self.count,
             leader_rx,
@@ -88,16 +88,18 @@ impl<S: state::State> Config<S> {
             self.timeout,
         );
 
+        let acceptor = acceptor_tx.clone();
         let self_id = self.id;
+        let timeout = self.timeout;
         let shared = shared_tx.clone();
         tokio::spawn_async(async move {
             while let Some(Ok(stream)) = await!(internal_port.next()) {
                 let connecting = thread::peer::Connecting::new(
                     self_id,
                     stream,
-                    acceptor_tx.clone(),
+                    acceptor.clone(),
                     shared.clone(),
-                    self.timeout,
+                    timeout,
                 );
                 tokio::spawn(connecting.and_then(|peer| peer));
             }
@@ -111,13 +113,33 @@ impl<S: state::State> Config<S> {
                     replica_tx.clone(),
                     shared.clone(),
                 );
-
                 tokio::spawn(connecting.and_then(|client| client));
             }
         });
 
-        tokio::spawn(acceptor);
-        tokio::spawn(replica);
-        tokio::spawn(leader);
+        for peer_id in (0..self.count).filter(|id| *id != self_id) {
+            let acceptor = acceptor_tx.clone();
+            let shared = shared_tx.clone();
+            let addr = format!("127.0.0.1:{}", peer_id + INTERNAL_PORT)
+                .parse::<std::net::SocketAddr>()
+                .unwrap();
+            let connect = tokio::net::tcp::TcpStream::connect(&addr)
+                .map_err(|_| ())
+                .and_then(move |stream| {
+                    thread::peer::Peer::new(
+                        self_id,
+                        peer_id,
+                        stream,
+                        acceptor.clone(),
+                        shared.clone(),
+                        timeout,
+                    )
+                });
+            tokio::spawn(connect);
+        }
+
+        tokio::spawn(acceptor_thread);
+        tokio::spawn(replica_thread);
+        tokio::spawn(leader_thread);
     }
 }

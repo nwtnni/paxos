@@ -97,6 +97,31 @@ pub struct Peer<S: state::State> {
 }
 
 impl<S: state::State> Peer<S> {
+    pub fn new(
+        self_id: usize,
+        peer_id: usize,
+        stream: net::tcp::TcpStream,
+        acceptor_tx: Tx<acceptor::In<S::Command>>,
+        shared_tx: Shared<S>,
+        timeout: std::time::Duration,
+    ) -> Self {
+        let (peer_rx, peer_tx) = socket::split(stream);
+        let (tx, rx) = mpsc::unbounded();
+        shared_tx.write().connect_peer(peer_id, tx);
+        Peer {
+            self_id,
+            peer_id,
+            peer_rx,
+            peer_tx,
+            acceptor_tx,
+            shared_tx,
+            timeout: tokio::timer::Interval::new_interval(timeout),
+            rx,
+        }
+    }
+}
+
+impl<S: state::State> Peer<S> {
     fn respond_incoming(&self, message: In<S::Command>) {
         match message {
         | In::P1A(p1a) => {
