@@ -112,8 +112,8 @@ impl<S: state::State> Config<S> {
                     replica_tx.clone(),
                     shared.clone(),
                 );
-                let client = await!(connecting.run());
-                tokio::spawn_async(client.run());
+
+                tokio::spawn(connecting.and_then(|client| client));
             }
         });
 
