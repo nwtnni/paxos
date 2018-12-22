@@ -99,8 +99,7 @@ impl<S: state::State> Config<S> {
                     shared.clone(),
                     self.timeout,
                 );
-                let peer = await!(connecting.run());
-                tokio::spawn_async(peer.run());
+                tokio::spawn(connecting.and_then(|peer| peer));
             }
         });
 
