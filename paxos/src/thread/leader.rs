@@ -39,7 +39,7 @@ impl<S: state::State> Leader<S> {
         shared_tx: shared::Shared<S>,
         timeout: time::Duration,
     ) -> Self {
-        Leader {
+        let leader = Leader {
             id,
             count,
             self_rx,
@@ -53,22 +53,9 @@ impl<S: state::State> Leader<S> {
             proposals: Map::default(),
             backoff: time::Duration::from_millis(50),
             timeout,
-        }
-    }
-
-    pub async fn run(mut self) {
-        info!("starting...");
-        self.spawn_scout();
-        loop {
-            if let Some(Ok(message)) = await!(self.self_rx.next()) {
-                trace!("received message {:?}", message);
-                match message {
-                | In::Propose(proposal) => self.respond_propose(proposal),
-                | In::Preempt(ballot) => self.respond_preempt(ballot),
-                | In::Adopt(pvalues) => self.respond_adopt(pvalues),
-                }
-            }
-        }
+        };
+        leader.spawn_scout();
+        leader
     }
 
     fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
@@ -125,7 +112,7 @@ impl<S: state::State> Leader<S> {
         pmax.into_iter().map(|(s_id, (_, op))| (op, s_id))
     }
 
-    fn spawn_commander(&mut self, proposal: message::Proposal<S::Command>) {
+    fn spawn_commander(&self, proposal: message::Proposal<S::Command>) {
         let pvalue = message::PValue {
             s_id: proposal.s_id,
             b_id: self.ballot,
@@ -141,7 +128,7 @@ impl<S: state::State> Leader<S> {
         tokio::spawn(commander);
     }
 
-    fn spawn_scout(&mut self) {
+    fn spawn_scout(&self) {
         let scout = scout::Scout::new(
             self.self_tx.clone(),
             self.shared_tx.clone(),
@@ -151,5 +138,21 @@ impl<S: state::State> Leader<S> {
             self.timeout,
         );
         tokio::spawn_async(scout.run());
+    }
+}
+
+impl<S: state::State> Future for Leader<S> {
+    type Item = ();
+    type Error = ();
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+        while let Async::Ready(Some(message)) = self.self_rx.poll()? {
+            trace!("received message {:?}", message);
+            match message {
+            | In::Propose(proposal) => self.respond_propose(proposal),
+            | In::Preempt(ballot) => self.respond_preempt(ballot),
+            | In::Adopt(pvalues) => self.respond_adopt(pvalues),
+            }
+        }
+        Ok(Async::NotReady)
     }
 }
