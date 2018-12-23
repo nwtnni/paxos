@@ -102,13 +102,14 @@ impl<S: state::State> Leader<S> {
         where I: IntoIterator<Item = message::PValue<S::Command>> {
         let mut pmax: Map<usize, (message::BallotID, message::Command<S::Command>)> = Map::default();
         for pvalue in pvalues.into_iter() {
-            pmax.entry(pvalue.s_id)
-                .and_modify(|(b_id, command)| {
-                    if pvalue.b_id > *b_id {
-                        *b_id = pvalue.b_id;
-                        *command = pvalue.command;
-                    }
-                });
+            if let Some((b_id, command)) = pmax.get_mut(&pvalue.s_id) {
+                if pvalue.b_id > *b_id {
+                    *b_id = pvalue.b_id;
+                    *command = pvalue.command;
+                }
+            } else {
+                pmax.insert(pvalue.s_id, (pvalue.b_id, pvalue.command));
+            }
         }
         pmax.into_iter().map(|(s_id, (_, op))| (op, s_id))
     }
