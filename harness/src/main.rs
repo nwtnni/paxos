@@ -12,7 +12,6 @@ use tokio_serde_bincode::{ReadBincode, WriteBincode};
 use tokio::codec;
 
 mod command;
-mod socket;
 
 use crate::command::{Command, Execution};
 
