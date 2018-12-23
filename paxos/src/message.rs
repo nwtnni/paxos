@@ -12,6 +12,27 @@ pub struct CommandID<C: state::Command> {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(bound(serialize = "", deserialize = ""))]
+#[derive(Clone, Debug)]
+pub struct Command<C: state::Command>(C);
+
+impl<C: state::Command> Eq for Command<C> {}
+
+impl<C: state::Command> PartialEq for Command<C> {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.0.client_id() == rhs.0.client_id() &&
+        self.0.local_id() == rhs.0.local_id()
+    }
+}
+
+impl<C: state::Command> std::hash::Hash for Command<C> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.client_id().hash(state);
+        self.0.local_id().hash(state);
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BallotID {
     pub b_id: usize,
