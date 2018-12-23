@@ -36,8 +36,7 @@ impl<S: state::State> Future for Connecting<S> {
     type Item = Client<S>;
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        while let Async::Ready(Some(message)) = self.client_rx
-            .as_mut()
+        while let Async::Ready(Some(message)) = self.client_rx.as_mut()
             .unwrap()
             .poll()
             .map_err(|_| ())?
@@ -64,7 +63,6 @@ impl<S: state::State> Future for Connecting<S> {
         }
         Ok(Async::NotReady)
     }
-
 }
 
 pub struct Client<S: state::State> {

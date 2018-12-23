@@ -1,11 +1,15 @@
 #![feature(await_macro, async_await, futures_api, pin)]
 
+#[macro_use]
+extern crate tokio;
+
 use std::collections::HashMap as Map;
-use std::sync::{Arc, Mutex, atomic};
+use std::sync::{Arc, atomic};
 
 use structopt::StructOpt;
 use tokio::prelude::*;
 use tokio_serde_bincode::{ReadBincode, WriteBincode};
+use tokio::codec;
 
 mod command;
 mod socket;
@@ -32,11 +36,8 @@ async fn run() {
         .expect("[INTERNAL ERROR]: could not find file")
         .expect("[INTERNAL ERROR]: could not parse test");
 
-    // TCP incoming connections
-    let mut readers: Map<usize, socket::Rx> = Map::default();
-
-    // TCP outgoing connections
-    let mut writers: Map<usize, Arc<Mutex<socket::Tx>>> = Map::default();
+    // TCP connections
+    let mut connections: Map<usize, tokio::net::tcp::TcpStream> = Map::default();
 
     // Running servers
     let mut servers: Map<usize, std::process::Child> = Map::default();
@@ -68,34 +69,38 @@ async fn run() {
                 .map(|stream| tokio::net::tcp::TcpStream::from_std(stream, &tokio::reactor::Handle::default()))
                 .unwrap()
                 .expect("[INTERNAL ERROR]: could not connect to server");
-            let (rx, tx) = socket::split(connection);
-            readers.insert(id, rx);
-            writers.insert(id, Arc::new(Mutex::new(tx)));
+            connections.insert(id, connection);
         }
         | Command::Disconnect { id } => {
-            readers.remove(&id);
-            writers.remove(&id);
+            connections.remove(&id);
         }
         | Command::Get { id } => {
-            let writer = writers[&id].clone();
+            let writer = connections[&id].try_clone().unwrap();
             let counter = operations.clone();
-            tokio::spawn_async(async move {
-                let client_id = id;
-                let local_id = counter.fetch_add(1, atomic::Ordering::SeqCst);
-                let command = chatroom::Command {
-                    client_id,
-                    local_id,
-                    mode: chatroom::Mode::Get,
-                };
-                WriteBincode::new(&mut *writer.lock().unwrap())
-                    .send(command)
-                    .wait()
-                    .unwrap();
+            let client_id = id;
+            let local_id = counter.fetch_add(1, atomic::Ordering::SeqCst);
+            let command = chatroom::Command {
+                client_id,
+                local_id,
+                mode: chatroom::Mode::Get,
+            };
+
+            tokio::spawn_async(async {
+                let writer = WriteBincode::new(
+                    codec::length_delimited::Builder::new()
+                        .new_write(writer)
+                        .sink_from_err::<bincode::Error>()
+                );
+                let _ = await!(writer.send(command));
             });
 
-            let mut reader = readers.get_mut(&id).unwrap();
-            let (response, _) = ReadBincode::new(&mut reader)
-                .into_future()
+            let reader = ReadBincode::new(
+                codec::length_delimited::Builder::new()
+                    .new_read(&connections[&id])
+                    .from_err::<bincode::Error>()
+            );
+
+            let (response, _) = reader.into_future()
                 .wait()
                 .map_err(|_| ())
                 .unwrap();
@@ -105,21 +110,23 @@ async fn run() {
             }
         }
         | Command::Put { id, message } => {
-            let writer = writers[&id].clone();
+            let writer = connections[&id].try_clone().unwrap();
             let counter = operations.clone();
+            let client_id = id;
+            let local_id = counter.fetch_add(1, atomic::Ordering::SeqCst);
+            let command = chatroom::Command {
+                client_id,
+                local_id,
+                mode: chatroom::Mode::Put(message),
+            };
+
             tokio::spawn_async(async move {
-                let client_id = id;
-                let local_id = counter.fetch_add(1, atomic::Ordering::SeqCst);
-                let command = chatroom::Command {
-                    client_id,
-                    local_id,
-                    mode: chatroom::Mode::Put(message),
-                };
-                println!("writing {:?}", command);
-                WriteBincode::new(&mut *writer.lock().unwrap())
-                    .send(command)
-                    .wait()
-                    .unwrap();
+                let writer = WriteBincode::new(
+                    codec::length_delimited::Builder::new()
+                        .new_write(writer)
+                        .sink_from_err::<bincode::Error>()
+                );
+                let _ = await!(writer.send(command));
             });
         }
         | Command::Crash { id } => {

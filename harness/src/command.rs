@@ -5,7 +5,7 @@ pub struct Execution(pub Vec<Command>);
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Command {
     /// Start a replica with the given parameters
     Start {

@@ -12,5 +12,5 @@ serde = "1.0.82"
 structopt = "0.2.14"
 tokio-serde-bincode = "0.2.1"
 bincode = "1.0.1"
-tokio = "0.1.13"
+tokio = { version = "0.1.13", features = ["async-await-preview"] }
 futures = "0.1.25"

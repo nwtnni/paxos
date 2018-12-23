@@ -2,7 +2,7 @@ use serde_derive::{Serialize, Deserialize};
 use paxos;
 
 #[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Command {
     pub client_id: usize,
     pub local_id: usize,
@@ -10,20 +10,20 @@ pub struct Command {
 }
 
 #[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Mode {
     Get,
     Put(String),
 }
 
 #[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Response {
     Messages(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize)]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct State {
     pub messages: Vec<String>,
 }
