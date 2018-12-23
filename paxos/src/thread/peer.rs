@@ -18,6 +18,7 @@ pub enum In<C: state::Command> {
     P1B(message::P1B<C>),
     P2A(message::CommanderID, message::P2A<C>),
     P2B(message::CommanderID, message::P2B),
+    Decision(message::Proposal<C>),
     Ping(usize),
 }
 
@@ -143,6 +144,11 @@ impl<S: state::State> Peer<S> {
             self.shared_tx
                 .read()
                 .send_commander(c_id, p2b);
+        }
+        | In::Decision(proposal) => {
+            self.shared_tx
+                .read()
+                .send_replica(replica::In::Decision(proposal));
         }
         | In::Ping(_) => (),
         }

@@ -6,7 +6,7 @@ use tokio::timer;
 use crate::message;
 use crate::shared;
 use crate::state;
-use crate::thread::{leader, peer, replica, Tx, Rx};
+use crate::thread::{leader, peer, Tx, Rx};
 
 pub type In = message::P2B;
 
@@ -68,7 +68,7 @@ impl<S: state::State> Commander<S> {
         debug!("{:?} decided", self.pvalue);
         self.shared_tx
             .read()
-            .send_replica(replica::In::Decision(decide));
+            .broadcast(peer::In::Decision(decide));
     }
 
     fn send_preempt(&self, b_id: message::BallotID) {

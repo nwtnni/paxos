@@ -130,6 +130,7 @@ impl<S: state::State> State<S> {
         | peer::In::P1B(p1b) => self.send_scout(p1b),
         | peer::In::P2A(c_id, p2a) => self.send_acceptor(acceptor::In::P2A(c_id, p2a)),
         | peer::In::P2B(c_id, p2b) => self.send_commander(c_id, p2b),
+        | peer::In::Decision(proposal) => self.send_replica(replica::In::Decision(proposal)),
         | peer::In::Ping(_) => (),
         }
     }
@@ -140,5 +141,12 @@ impl<S: state::State> State<S> {
         for id in ids.into_iter() {
             self.send(*id, message.clone());
         }
+    }
+
+    pub fn broadcast(&self, message: peer::In<S::Command>) {
+        for tx in self.peer_txs.values() {
+            let _ = tx.unbounded_send(message.clone());
+        }
+        self.forward(message);
     }
 }
