@@ -25,6 +25,7 @@ impl<T> Identifier for T where T: std::hash::Hash
 
 /// Operation that can be applied to a state machine
 pub trait Command: Send
+    + Clone
     + std::fmt::Debug
     + std::marker::Unpin
     + serde::Serialize

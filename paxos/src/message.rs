@@ -4,17 +4,20 @@ use crate::state;
 
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
-pub struct CommandID<C: state::Command> {
-    pub c_id: C::ClientID, 
-    pub l_id: C::LocalID,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(bound(serialize = "", deserialize = ""))]
 #[derive(Clone, Debug)]
 pub struct Command<C: state::Command>(C);
+
+impl<C: state::Command> Command<C> {
+    pub fn inner(self) -> C {
+        self.0
+    }
+}
+
+impl<C: state::Command> From<C> for Command<C> {
+    fn from(command: C) -> Self {
+        Command(command)
+    }
+}
 
 impl<C: state::Command> Eq for Command<C> {}
 
@@ -29,6 +32,13 @@ impl<C: state::Command> std::hash::Hash for Command<C> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.client_id().hash(state);
         self.0.local_id().hash(state);
+    }
+}
+
+impl<C: state::Command> std::ops::Deref for Command<C> {
+    type Target = C;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -50,19 +60,10 @@ pub struct CommanderID {
 #[serde(bound(serialize = "", deserialize = ""))]
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
-pub struct Ballot<C: state::Command> {
-    pub b_id: BallotID,
-    pub c_id: CommandID<C>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(bound(serialize = "", deserialize = ""))]
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
 pub struct PValue<C: state::Command> {
     pub s_id: usize,
     pub b_id: BallotID,
-    pub c_id: CommandID<C>,
+    pub command: Command<C>,
 }
 
 pub type P1A = BallotID;
@@ -92,5 +93,5 @@ pub struct P2B {
 #[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
 pub struct Proposal<C: state::Command> {
     pub s_id: usize,
-    pub c_id: CommandID<C>,
+    pub command: Command<C>,
 }

@@ -1,5 +1,3 @@
-use std::collections::HashMap as Map;
-
 use bimap::BiMap;
 use tokio::prelude::*;
 
@@ -22,9 +20,8 @@ pub struct Replica<S: state::State> {
     state: S,
     decision_slot: usize,
     proposal_slot: usize,
-    proposals: BiMap<message::CommandID<S::Command>, usize>,
-    decisions: BiMap<message::CommandID<S::Command>, usize>,
-    commands: Map<message::CommandID<S::Command>, S::Command>,
+    proposals: BiMap<message::Command<S::Command>, usize>,
+    decisions: BiMap<message::Command<S::Command>, usize>,
 }
 
 impl<S: state::State> Replica<S> {
@@ -42,68 +39,54 @@ impl<S: state::State> Replica<S> {
             proposal_slot: 0,
             proposals: BiMap::default(),
             decisions: BiMap::default(),
-            commands: Map::default(),
         }
     }
 
     fn respond_request(&mut self, command: S::Command) {
-        let c_id = message::CommandID {
-            c_id: command.client_id(),
-            l_id: command.local_id(),
-        };
-        self.commands.insert(c_id.clone(), command);
-        self.propose(c_id);
+        self.propose(command.into());
     }
 
     fn respond_decision(&mut self, decision: message::Proposal<S::Command>) {
-        self.decisions.insert(decision.c_id, decision.s_id);
-
+        self.decisions.insert(decision.command.clone(), decision.s_id);
         while let Some(c1) = self.decisions.get_by_right(&self.decision_slot).cloned() {
             if let Some(c2) = self.proposals.get_by_right(&self.decision_slot).cloned() {
                 if c1 != c2 {
                     self.propose(c2);
                 }
             }
-            let command = self.commands.remove(&c1)
-                .expect("[INTERNAL ERROR]: each command should be performed exactly once");
-            self.perform(command);
+            self.perform(c1);
         }
     }
 
-    fn propose(&mut self, c_id: message::CommandID<S::Command>) {
-        if self.decisions.contains_left(&c_id) { return }
+    fn propose(&mut self, command: message::Command<S::Command>) {
+        if self.decisions.contains_left(&command) { return }
 
         while self.proposals.contains_right(&self.proposal_slot)
            || self.decisions.contains_right(&self.proposal_slot) {
             self.proposal_slot += 1;
         }
 
-        self.proposals.insert(c_id.clone(), self.proposal_slot);
+        self.proposals.insert(command.clone(), self.proposal_slot);
 
         let proposal = leader::In::Propose(message::Proposal {
             s_id: self.proposal_slot,
-            c_id: c_id,
+            command: command,
         });
 
         self.leader_tx.unbounded_send(proposal)
             .expect("[INTERNAL ERROR]: failed to send proposal");
     }
 
-    fn perform(&mut self, c: S::Command) {
-        let client_id = c.client_id();
-        let local_id = c.local_id();
-        let command_id = message::CommandID {
-            c_id: client_id.clone(),
-            l_id: local_id,
-        };
-        if let Some(s) = self.decisions.get_by_left(&command_id) {
+    fn perform(&mut self, command: message::Command<S::Command>) {
+        if let Some(s) = self.decisions.get_by_left(&command) {
             if *s < self.decision_slot {
                 self.decision_slot += 1;
                 return
             }
         }
-        info!("executing {:?} in slot {}", c, self.decision_slot);
-        if let Some(result) = self.state.execute(self.decision_slot, c) {
+        info!("executing {:?} in slot {}", command, self.decision_slot);
+        let client_id = command.client_id();
+        if let Some(result) = self.state.execute(self.decision_slot, command.inner()) {
             self.shared_tx
                 .read()
                 .send_client(client_id, result);

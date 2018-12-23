@@ -63,7 +63,7 @@ impl<S: state::State> Commander<S> {
     fn send_decide(&self) {
         let decide = message::Proposal {
             s_id: self.pvalue.s_id,
-            c_id: self.pvalue.c_id.clone(),
+            command: self.pvalue.command.clone(),
         };
         debug!("{:?} decided", self.pvalue);
         self.shared_tx

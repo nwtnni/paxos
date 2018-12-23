@@ -24,7 +24,7 @@ pub struct Leader<S: state::State> {
     shared_tx: shared::Shared<S>,
     active: bool,
     ballot: message::BallotID,
-    proposals: Map<message::CommandID<S::Command>, usize>,
+    proposals: Map<message::Command<S::Command>, usize>,
     backoff: f32,
     timeout: time::Duration,
 }
@@ -59,10 +59,10 @@ impl<S: state::State> Leader<S> {
     }
 
     fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
-        if self.proposals.contains_key(&proposal.c_id) {
+        if self.proposals.contains_key(&proposal.command) {
             return
         }
-        self.proposals.insert(proposal.c_id.clone(), proposal.s_id);
+        self.proposals.insert(proposal.command.clone(), proposal.s_id);
         if self.active {
             self.spawn_commander(proposal);
         }
@@ -87,10 +87,10 @@ impl<S: state::State> Leader<S> {
             &mut self.proposals,
             Map::with_capacity(0)
         );
-        for (c_id, s_id) in &proposals {
+        for (command, s_id) in &proposals {
             let proposal = message::Proposal {
                 s_id: s_id.clone(),
-                c_id: c_id.clone(),
+                command: command.clone(),
             };
             self.spawn_commander(proposal);
         }
@@ -98,15 +98,15 @@ impl<S: state::State> Leader<S> {
         self.active = true;
     }
 
-    fn pmax<I>(pvalues: I) -> impl Iterator<Item = (message::CommandID<S::Command>, usize)>
+    fn pmax<I>(pvalues: I) -> impl Iterator<Item = (message::Command<S::Command>, usize)>
         where I: IntoIterator<Item = message::PValue<S::Command>> {
-        let mut pmax: Map<usize, (message::BallotID, message::CommandID<S::Command>)> = Map::default();
+        let mut pmax: Map<usize, (message::BallotID, message::Command<S::Command>)> = Map::default();
         for pvalue in pvalues.into_iter() {
             pmax.entry(pvalue.s_id)
-                .and_modify(|(b_id, c_id)| {
+                .and_modify(|(b_id, command)| {
                     if pvalue.b_id > *b_id {
                         *b_id = pvalue.b_id;
-                        *c_id = pvalue.c_id;
+                        *command = pvalue.command;
                     }
                 });
         }
@@ -117,7 +117,7 @@ impl<S: state::State> Leader<S> {
         let pvalue = message::PValue {
             s_id: proposal.s_id,
             b_id: self.ballot,
-            c_id: proposal.c_id,
+            command: proposal.command,
         };
         let commander = commander::Commander::new(
             self.self_tx.clone(),
