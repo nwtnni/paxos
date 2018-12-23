@@ -25,6 +25,26 @@ struct Opt {
     file: std::path::PathBuf,
 }
 
+struct Server(std::process::Child);
+
+impl Server {
+    fn new(path: &std::path::PathBuf, id: usize, port: usize, count: usize) -> Self {
+        std::process::Command::new(path)
+            .args(&["-i", &id.to_string()])
+            .args(&["-p", &port.to_string()])
+            .args(&["-c", &count.to_string()])
+            .spawn()
+            .map(Server)
+            .expect("[INTERNAL ERROR]: could not spawn server")
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        self.0.kill().ok();
+    }
+}
+
 async fn run() {
 
     let opt = Opt::from_args();
@@ -39,7 +59,7 @@ async fn run() {
     let mut connections: Map<usize, tokio::net::tcp::TcpStream> = Map::default();
 
     // Running servers
-    let mut servers: Map<usize, std::process::Child> = Map::default();
+    let mut servers: Map<usize, Server> = Map::default();
 
     // Server ports
     let mut ports: Map<usize, usize> = Map::default();
@@ -51,14 +71,7 @@ async fn run() {
         println!("Executing command {:?}", command);
         match command {
         | Command::Start { id, port, count } => {
-            let child = std::process::Command::new(&opt.server)
-                .args(&["-i", &id.to_string()])
-                .args(&["-p", &port.to_string()])
-                .args(&["-c", &count.to_string()])
-                .spawn()
-                .expect("[INTERNAL ERROR]: could not spawn server");
-            println!("child {:?}", child);
-            servers.insert(id, child);
+            servers.insert(id, Server::new(&opt.server, id, port, count));
             ports.insert(id, port);
         }
         | Command::Connect { id } => {
@@ -128,9 +141,7 @@ async fn run() {
             });
         }
         | Command::Crash { id } => {
-            if let Some(mut server) = servers.remove(&id) {
-                server.kill().ok();
-            }
+            servers.remove(&id);
         }
         | Command::Sleep { ms } => {
             std::thread::sleep(std::time::Duration::from_millis(ms))

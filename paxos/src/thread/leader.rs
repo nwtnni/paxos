@@ -25,7 +25,7 @@ pub struct Leader<S: state::State> {
     active: bool,
     ballot: message::BallotID,
     proposals: Map<message::CommandID<S::Command>, usize>,
-    backoff: time::Duration,
+    backoff: f32,
     timeout: time::Duration,
 }
 
@@ -51,7 +51,7 @@ impl<S: state::State> Leader<S> {
                 l_id: id,
             },
             proposals: Map::default(),
-            backoff: time::Duration::from_millis(50),
+            backoff: 100.0 * rand::random::<f32>(),
             timeout,
         };
         leader.spawn_scout();
@@ -75,6 +75,7 @@ impl<S: state::State> Leader<S> {
             b_id: ballot.b_id + 1,
             l_id: self.id,
         };
+        self.backoff *= 1.0 + rand::random::<f32>() / 2.0;
         self.spawn_scout();
     }
 
@@ -134,7 +135,7 @@ impl<S: state::State> Leader<S> {
             self.shared_tx.clone(),
             self.ballot,
             self.count,
-            self.backoff,
+            std::time::Duration::from_millis(self.backoff.round() as u64),
             self.timeout,
         );
         tokio::spawn(scout);
