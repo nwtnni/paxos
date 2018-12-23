@@ -100,8 +100,7 @@ async fn run() {
                     .from_err::<bincode::Error>()
             );
 
-            let (response, _) = reader.into_future()
-                .wait()
+            let (response, _) = await!(reader.into_future())
                 .map_err(|_| ())
                 .unwrap();
 

@@ -37,6 +37,7 @@ fn main() {
             ))
         })
         .level_for("paxos", log::LevelFilter::Trace)
+        .level_for("tokio_io", log::LevelFilter::Off)
         .level_for("tokio_threadpool", log::LevelFilter::Off)
         .level_for("tokio_reactor", log::LevelFilter::Off)
         .level_for("mio", log::LevelFilter::Off)

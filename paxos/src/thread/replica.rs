@@ -20,7 +20,8 @@ pub struct Replica<S: state::State> {
     shared_tx: shared::Shared<S>,
     rx: Rx<In<S::Command>>,
     state: S,
-    slot: usize,
+    decision_slot: usize,
+    proposal_slot: usize,
     proposals: BiMap<message::CommandID<S::Command>, usize>,
     decisions: BiMap<message::CommandID<S::Command>, usize>,
     commands: Map<message::CommandID<S::Command>, S::Command>,
@@ -37,7 +38,8 @@ impl<S: state::State> Replica<S> {
             shared_tx,
             rx,
             state: S::default(),
-            slot: 0,
+            decision_slot: 0,
+            proposal_slot: 0,
             proposals: BiMap::default(),
             decisions: BiMap::default(),
             commands: Map::default(),
@@ -56,8 +58,8 @@ impl<S: state::State> Replica<S> {
     fn respond_decision(&mut self, decision: message::Proposal<S::Command>) {
         self.decisions.insert(decision.c_id, decision.s_id);
 
-        while let Some(c1) = self.decisions.get_by_right(&self.slot).cloned() {
-            if let Some(c2) = self.proposals.get_by_right(&self.slot).cloned() {
+        while let Some(c1) = self.decisions.get_by_right(&self.decision_slot).cloned() {
+            if let Some(c2) = self.proposals.get_by_right(&self.decision_slot).cloned() {
                 if c1 != c2 {
                     self.propose(c2);
                 }
@@ -71,15 +73,15 @@ impl<S: state::State> Replica<S> {
     fn propose(&mut self, c_id: message::CommandID<S::Command>) {
         if self.decisions.contains_left(&c_id) { return }
 
-        let next = 1 + std::cmp::max(
-            self.proposals.right_values().max().unwrap_or(&0),
-            self.decisions.right_values().max().unwrap_or(&0),
-        );
+        while self.proposals.contains_right(&self.proposal_slot)
+           || self.decisions.contains_right(&self.proposal_slot) {
+            self.proposal_slot += 1;
+        }
 
-        self.proposals.insert(c_id.clone(), next);
+        self.proposals.insert(c_id.clone(), self.proposal_slot);
 
         let proposal = leader::In::Propose(message::Proposal {
-            s_id: next,
+            s_id: self.proposal_slot,
             c_id: c_id,
         });
 
@@ -95,18 +97,18 @@ impl<S: state::State> Replica<S> {
             l_id: local_id,
         };
         if let Some(s) = self.decisions.get_by_left(&command_id) {
-            if *s < self.slot {
-                self.slot += 1;
+            if *s < self.decision_slot {
+                self.decision_slot += 1;
                 return
             }
         }
-        info!("executing {:?} in slot {}", c, self.slot);
-        if let Some(result) = self.state.execute(self.slot, c) {
+        info!("executing {:?} in slot {}", c, self.decision_slot);
+        if let Some(result) = self.state.execute(self.decision_slot, c) {
             self.shared_tx
                 .read()
                 .send_client(client_id, result);
         }
-        self.slot += 1;
+        self.decision_slot += 1;
     }
 }
 
