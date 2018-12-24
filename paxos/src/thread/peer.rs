@@ -61,7 +61,7 @@ impl<S: state::State> Future for Connecting<S> {
         {
             match message {
             | In::Ping(peer_id) => {
-                debug!("connected to {}", peer_id);
+                info!("connected to {}", peer_id);
                 let (tx, rx) = mpsc::unbounded();
                 self.shared_tx.as_mut()
                     .unwrap()
@@ -108,6 +108,7 @@ impl<S: state::State> Peer<S> {
         let (peer_rx, peer_tx) = socket::split(stream);
         let (tx, rx) = mpsc::unbounded();
         shared_tx.write().connect_peer(peer_id, tx);
+        info!("connected to {}", peer_id);
         Peer {
             self_id,
             peer_id,
@@ -189,7 +190,7 @@ impl<S: state::State> Future for Peer<S> {
 
 impl<S: state::State> Drop for Peer<S> {
     fn drop(&mut self) {
-        debug!("disconnected from {}", self.peer_id);
+        info!("disconnected from {}", self.peer_id);
         self.shared_tx.write().disconnect_peer(self.peer_id);
     }
 }

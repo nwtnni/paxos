@@ -59,10 +59,10 @@ impl<S: state::State> Leader<S> {
     }
 
     fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
-        info!("Responding to proposal {:?} with proposals {:?}", proposal, self.proposals);
         if self.proposals.contains_key(&proposal.s_id) {
             return
         }
+        debug!("{:?} proposed", proposal);
         self.proposals.insert(proposal.s_id, proposal.command.clone());
         if self.active {
             self.spawn_commander(proposal);
@@ -71,13 +71,13 @@ impl<S: state::State> Leader<S> {
 
     fn respond_preempt(&mut self, ballot: message::BallotID) {
         if ballot <= self.ballot { return }
+        debug!("preempted by {:?}", ballot);
         self.active = false;
         self.ballot = message::BallotID {
             b_id: ballot.b_id + 1,
             l_id: self.id,
         };
         self.backoff *= 1.0 + rand::random::<f32>() / 2.0;
-        info!("backoff: {:?}", self.backoff);
         self.spawn_scout();
     }
 
@@ -92,7 +92,6 @@ impl<S: state::State> Leader<S> {
                 self.proposals.insert(s_id, command);
             }
         }
-        info!("{:?}", self.proposals);
 
         for (s_id, command) in &self.proposals {
             let proposal = message::Proposal {
@@ -102,6 +101,7 @@ impl<S: state::State> Leader<S> {
             self.spawn_commander(proposal);
         }
 
+        info!("adopted with ballot {:?}", self.ballot);
         self.active = true;
     }
 
@@ -155,7 +155,7 @@ impl<S: state::State> Future for Leader<S> {
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         while let Async::Ready(Some(message)) = self.self_rx.poll()? {
-            info!("received {:?}", message);
+            debug!("received {:?}", message);
             match message {
             | In::Propose(proposal) => self.respond_propose(proposal),
             | In::Preempt(ballot) => self.respond_preempt(ballot),

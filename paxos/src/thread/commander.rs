@@ -40,7 +40,7 @@ impl<S: state::State> Commander<S> {
             std::time::Instant::now() + timeout,
             timeout,
         );
-        info!("starting for {:?}", id);
+        debug!("starting for {:?}", id);
         shared_tx.write().connect_commander(id, self_tx);
         let commander = Commander {
             id,
@@ -71,7 +71,7 @@ impl<S: state::State> Commander<S> {
             s_id: self.pvalue.s_id,
             command: self.pvalue.command.clone(),
         };
-        info!("{:?} decided", self.pvalue);
+        debug!("{:?} decided", self.pvalue);
         self.shared_tx
             .read()
             .broadcast(peer::In::Decision(decide));
@@ -79,7 +79,7 @@ impl<S: state::State> Commander<S> {
 
     fn send_preempt(&self, b_id: message::BallotID) {
         let preempt = leader::In::Preempt::<S::Command>(b_id);
-        info!("{:?} preempted", self.pvalue);
+        debug!("{:?} preempted", self.pvalue);
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempted");

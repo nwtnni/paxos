@@ -40,7 +40,7 @@ impl<S: state::State> Future for Connecting<S> {
             .poll()
             .map_err(|_| ())?
         {
-            debug!("connected to {:?}", message.client_id());
+            info!("connected to {:?}", message.client_id());
             let client_id = message.client_id();
             let (tx, rx) = mpsc::unbounded();
             self.shared_tx.as_mut()
@@ -80,14 +80,14 @@ impl<S: state::State> Future for Client<S> {
 
         // Forward incoming requests
         while let Async::Ready(Some(message)) = self.client_rx.poll().map_err(|_| ())?  {
-            info!("received {:?}", message);
+            trace!("received {:?}", message);
             self.replica_tx.unbounded_send(replica::In::Request(message))
                 .expect("[INTERNAL ERROR]: failed to send to replica")
         }
 
         // Forward outgoing responses
         while let Async::Ready(Some(message)) = self.rx.poll().map_err(|_| ())?  {
-            info!("sending {:?}", message);
+            trace!("sending {:?}", message);
             self.client_tx.start_send(message).map_err(|_| ())?;
         }
 
@@ -102,7 +102,7 @@ impl<S: state::State> Future for Client<S> {
 
 impl<S: state::State> Drop for Client<S> {
     fn drop(&mut self) {
-        debug!("disconnected from {:?}", self.client_id);
+        info!("disconnected from {:?}", self.client_id);
         self.shared_tx.write().disconnect_client(&self.client_id);
     }
 }

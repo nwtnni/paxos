@@ -41,7 +41,7 @@ impl<S: state::State> Scout<S> {
         let pvalues = Set::default();
         let (self_tx, self_rx) = mpsc::unbounded();
         shared_tx.write().replace_scout(self_tx);
-        info!("starting for {:?}", ballot);
+        debug!("starting for {:?} with delay {:?}", ballot, delay);
         Scout {
             rx: self_rx,
             leader_tx,
@@ -117,5 +117,11 @@ impl<S: state::State> Future for Scout<S> {
             }
         }
         Ok(Async::NotReady)
+    }
+}
+
+impl<S: state::State> Drop for Scout<S> {
+    fn drop(&mut self) {
+        debug!("dropping {:?}", self.ballot); 
     }
 }
