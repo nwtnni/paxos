@@ -9,6 +9,7 @@ mod message;
 mod state;
 mod shared;
 mod socket;
+mod storage;
 mod thread;
 
 pub use crate::config::Config;
