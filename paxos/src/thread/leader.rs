@@ -1,6 +1,5 @@
 use std::time;
 
-use bimap::BiMap;
 use hashbrown::HashMap as Map;
 use tokio::prelude::*;
 
@@ -25,7 +24,7 @@ pub struct Leader<S: state::State> {
     shared_tx: shared::Shared<S>,
     active: bool,
     ballot: message::BallotID,
-    proposals: BiMap<usize, message::Command<S::Command>>,
+    proposals: Map<usize, message::Command<S::Command>>,
     backoff: f32,
     timeout: time::Duration,
 }
@@ -51,7 +50,7 @@ impl<S: state::State> Leader<S> {
                 b_id: 1,
                 l_id: id,
             },
-            proposals: BiMap::default(),
+            proposals: Map::default(),
             backoff: 100.0 * rand::random::<f32>(),
             timeout,
         };
@@ -61,7 +60,7 @@ impl<S: state::State> Leader<S> {
 
     fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
         info!("Responding to proposal {:?} with proposals {:?}", proposal, self.proposals);
-        if self.proposals.contains_right(&proposal.command) {
+        if self.proposals.contains_key(&proposal.s_id) {
             return
         }
         self.proposals.insert(proposal.s_id, proposal.command.clone());
@@ -71,6 +70,7 @@ impl<S: state::State> Leader<S> {
     }
 
     fn respond_preempt(&mut self, ballot: message::BallotID) {
+        if ballot <= self.ballot { return }
         self.active = false;
         self.ballot = message::BallotID {
             b_id: ballot.b_id + 1,
@@ -88,7 +88,7 @@ impl<S: state::State> Leader<S> {
         );
 
         for (s_id, command) in proposals {
-            if !self.proposals.contains_left(&s_id) {
+            if !self.proposals.contains_key(&s_id) {
                 self.proposals.insert(s_id, command);
             }
         }

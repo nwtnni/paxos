@@ -95,7 +95,6 @@ impl<S: state::State> Future for Scout<S> {
 
         // Respond to incoming P1B messages
         while let Async::Ready(Some(p1b)) = self.rx.poll()? {
-            debug!("received {:?}", p1b);
 
             // Scout has not been preempted
             if p1b.b_id == self.ballot {

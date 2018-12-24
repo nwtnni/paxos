@@ -31,15 +31,18 @@ impl<S: state::State> Commander<S> {
     ) -> Self {
         let waiting = (0..count).collect();
         let minority = (count - 1) / 2;
-        let timeout = timer::Interval::new_interval(timeout);
         let (self_tx, self_rx) = mpsc::unbounded();
         let id = message::CommanderID {
             b_id: pvalue.b_id,
             s_id: pvalue.s_id,
         };
-        shared_tx.write().connect_commander(id, self_tx);
+        let timeout = timer::Interval::new(
+            std::time::Instant::now() + timeout,
+            timeout,
+        );
         info!("starting for {:?}", id);
-        Commander {
+        shared_tx.write().connect_commander(id, self_tx);
+        let commander = Commander {
             id,
             rx: self_rx,
             leader_tx,
@@ -48,7 +51,9 @@ impl<S: state::State> Commander<S> {
             minority,
             pvalue,
             timeout,
-        }
+        };
+        commander.send_p2a();
+        commander
     }
 
     fn send_p2a(&self) {
