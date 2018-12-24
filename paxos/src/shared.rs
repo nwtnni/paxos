@@ -1,6 +1,6 @@
+use std::collections::HashMap as Map;
 use std::sync::Arc;
 
-use hashbrown::HashMap as Map;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::message;

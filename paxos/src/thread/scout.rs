@@ -1,6 +1,6 @@
+use std::collections::HashSet as Set;
 use std::time;
 
-use hashbrown::HashSet as Set;
 use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::timer;

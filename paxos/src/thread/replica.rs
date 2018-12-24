@@ -1,4 +1,4 @@
-use bimap::BiMap;
+use std::collections::HashMap as Map;
 use tokio::prelude::*;
 
 use crate::message;
@@ -20,8 +20,8 @@ pub struct Replica<S: state::State> {
     state: S,
     decision_slot: usize,
     proposal_slot: usize,
-    proposals: BiMap<message::Command<S::Command>, usize>,
-    decisions: BiMap<message::Command<S::Command>, usize>,
+    proposals: Map<usize, message::Command<S::Command>>,
+    decisions: Map<usize, message::Command<S::Command>>,
 }
 
 impl<S: state::State> Replica<S> {
@@ -37,8 +37,8 @@ impl<S: state::State> Replica<S> {
             state: S::default(),
             decision_slot: 0,
             proposal_slot: 0,
-            proposals: BiMap::default(),
-            decisions: BiMap::default(),
+            proposals: Map::default(),
+            decisions: Map::default(),
         }
     }
 
@@ -47,11 +47,11 @@ impl<S: state::State> Replica<S> {
     }
 
     fn respond_decision(&mut self, decision: message::Proposal<S::Command>) {
-        self.decisions.insert(decision.command.clone(), decision.s_id);
-        while let Some(c1) = self.decisions.get_by_right(&self.decision_slot).cloned() {
-            if let Some(c2) = self.proposals.get_by_right(&self.decision_slot).cloned() {
-                if c1 != c2 {
-                    self.propose(c2);
+        self.decisions.insert(decision.s_id, decision.command);
+        while let Some(c1) = self.decisions.get(&self.decision_slot).cloned() {
+            if let Some(c2) = self.proposals.get(&self.decision_slot) {
+                if c1 != *c2 {
+                    self.propose(c2.clone());
                 }
             }
             self.perform(c1);
@@ -59,15 +59,17 @@ impl<S: state::State> Replica<S> {
     }
 
     fn propose(&mut self, command: message::Command<S::Command>) {
-        if self.decisions.contains_left(&command) { return }
+        for previous in self.decisions.values() {
+            if *previous == command { return }
+        }
 
-        while self.proposals.contains_right(&self.proposal_slot)
-           || self.decisions.contains_right(&self.proposal_slot) {
+        while self.proposals.contains_key(&self.proposal_slot)
+           || self.decisions.contains_key(&self.proposal_slot) {
             self.proposal_slot += 1;
         }
 
         info!("proposing {:?} for slot {:?}", command, self.proposal_slot);
-        self.proposals.insert(command.clone(), self.proposal_slot);
+        self.proposals.insert(self.proposal_slot, command.clone());
 
         let proposal = leader::In::Propose(message::Proposal {
             s_id: self.proposal_slot,
@@ -79,8 +81,8 @@ impl<S: state::State> Replica<S> {
     }
 
     fn perform(&mut self, command: message::Command<S::Command>) {
-        if let Some(s) = self.decisions.get_by_left(&command) {
-            if *s < self.decision_slot {
+        for (s, previous) in &self.decisions {
+            if *previous == command && *s < self.decision_slot {
                 self.decision_slot += 1;
                 return
             }
