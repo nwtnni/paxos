@@ -1,5 +1,4 @@
 use futures::sync::mpsc;
-use tokio_serde_bincode::WriteBincode;
 use tokio::prelude::*;
 use tokio::net;
 
@@ -11,7 +10,7 @@ use crate::thread::{Rx, Tx, replica};
 
 pub struct Connecting<S: state::State> {
     client_rx: Option<socket::Rx<S::Command>>,
-    client_tx: Option<socket::Tx>,
+    client_tx: Option<socket::Tx<S::Response>>,
     replica_tx: Option<Tx<replica::In<S::Command>>>,
     shared_tx: Option<shared::Shared<S>>,
 }
@@ -68,7 +67,7 @@ impl<S: state::State> Future for Connecting<S> {
 pub struct Client<S: state::State> {
     client_id: <S::Command as state::Command>::ClientID,
     client_rx: socket::Rx<S::Command>,
-    client_tx: socket::Tx,
+    client_tx: socket::Tx<S::Response>,
     replica_tx: Tx<replica::In<S::Command>>,
     shared_tx: shared::Shared<S>,
     rx: Rx<S::Response>,
@@ -78,23 +77,23 @@ impl<S: state::State> Future for Client<S> {
     type Item = ();
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        while let Async::Ready(Some(message)) = self.client_rx
-            .poll()
-            .map_err(|_| ())?
-        {
+
+        // Forward incoming requests
+        while let Async::Ready(Some(message)) = self.client_rx.poll().map_err(|_| ())?  {
             info!("received {:?}", message);
             self.replica_tx.unbounded_send(replica::In::Request(message))
                 .expect("[INTERNAL ERROR]: failed to send to replica")
         }
 
-        while let Async::Ready(Some(message)) = self.rx
-            .poll()
-            .map_err(|_| ())?
-        {
-            WriteBincode::new(&mut self.client_tx)
-                .send(message)
-                .wait()
-                .map_err(|_| ())?;
+        // Forward outgoing responses
+        while let Async::Ready(Some(message)) = self.rx.poll().map_err(|_| ())?  {
+            info!("sending {:?}", message);
+            self.client_tx.start_send(message).map_err(|_| ())?;
+        }
+
+        // Complete sends
+        if let Async::NotReady = self.client_tx.poll_complete().map_err(|_| ())? {
+            return Ok(Async::NotReady)
         }
 
         Ok(Async::NotReady)

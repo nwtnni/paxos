@@ -1,7 +1,6 @@
 use futures::sync::mpsc;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
-use tokio_serde_bincode::WriteBincode;
 use tokio::net;
 
 use crate::message;
@@ -25,7 +24,7 @@ pub enum In<C: state::Command> {
 pub struct Connecting<S: state::State> {
     self_id: usize,
     peer_rx: Option<socket::Rx<In<S::Command>>>,
-    peer_tx: Option<socket::Tx>,
+    peer_tx: Option<socket::Tx<In<S::Command>>>,
     acceptor_tx: Option<Tx<acceptor::In<S::Command>>>,
     shared_tx: Option<Shared<S>>,
     timeout: std::time::Duration,
@@ -91,7 +90,7 @@ pub struct Peer<S: state::State> {
     self_id: usize,
     rx: Rx<In<S::Command>>,
     peer_rx: socket::Rx<In<S::Command>>,
-    peer_tx: socket::Tx,
+    peer_tx: socket::Tx<In<S::Command>>,
     acceptor_tx: Tx<acceptor::In<S::Command>>,
     shared_tx: Shared<S>,
     timeout: tokio::timer::Interval,
@@ -153,41 +152,35 @@ impl<S: state::State> Peer<S> {
         | In::Ping(_) => (),
         }
     }
-
-    fn send(&mut self, message: In<S::Command>) -> Result<(), ()> {
-        WriteBincode::new(&mut self.peer_tx)
-            .send(message)
-            .wait()
-            .map(|_| ())
-            .map_err(|_| ())
-    }
 }
 
 impl<S: state::State> Future for Peer<S> {
     type Item = ();
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        // Drop connection to unresponsive peers
-        while let Async::Ready(Some(_)) = self.timeout
-            .poll()
-            .map_err(|_| ())?
-        {
-            self.send(In::Ping(self.self_id)).map_err(|_| ())?;
+
+        // Drop connections to unresponsive peers
+        while let Async::Ready(Some(_)) = self.timeout.poll().map_err(|_| ())?  {
+            self.peer_tx.start_send(In::Ping(self.self_id)).map_err(|_| ())?;
         }
 
-        while let Async::Ready(Some(message)) = self.peer_rx
-            .poll()
-            .map_err(|_| ())?
-        {
+        // Forward incoming messages
+        while let Async::Ready(Some(message)) = self.peer_rx.poll().map_err(|_| ())?  {
             if let In::Ping(_) = &message {} else {
                 trace!("received {:?}", message);
                 self.respond_incoming(message);
             }
         }
 
+        // Forward outgoing messages
         while let Async::Ready(Some(message)) = self.rx.poll()? {
             trace!("sending {:?}", message);
-            self.send(message).map_err(|_| ())?;
+            self.peer_tx.start_send(message).map_err(|_| ())?;
+        }
+
+        // Complete sends
+        if let Async::NotReady = self.peer_tx.poll_complete().map_err(|_| ())? {
+            return Ok(Async::NotReady)
         }
 
         Ok(Async::NotReady)
