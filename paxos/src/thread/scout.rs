@@ -41,6 +41,7 @@ impl<S: state::State> Scout<S> {
         let pvalues = Set::default();
         let (self_tx, self_rx) = mpsc::unbounded();
         shared_tx.write().replace_scout(self_tx);
+        info!("starting for {:?}", ballot);
         Scout {
             rx: self_rx,
             leader_tx,
@@ -94,7 +95,7 @@ impl<S: state::State> Future for Scout<S> {
 
         // Respond to incoming P1B messages
         while let Async::Ready(Some(p1b)) = self.rx.poll()? {
-            trace!("received message {:?}", p1b);
+            debug!("received {:?}", p1b);
 
             // Scout has not been preempted
             if p1b.b_id == self.ballot {
@@ -111,8 +112,7 @@ impl<S: state::State> Future for Scout<S> {
             }
 
             // Notify leader that we've been preempted
-            else {
-                debug_assert!(p1b.b_id > self.ballot);
+            else if p1b.b_id > self.ballot {
                 self.send_preempt(p1b.b_id);
                 return Ok(Async::Ready(()))
             }

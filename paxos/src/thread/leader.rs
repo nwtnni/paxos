@@ -1,5 +1,6 @@
 use std::time;
 
+use bimap::BiMap;
 use hashbrown::HashMap as Map;
 use tokio::prelude::*;
 
@@ -24,7 +25,7 @@ pub struct Leader<S: state::State> {
     shared_tx: shared::Shared<S>,
     active: bool,
     ballot: message::BallotID,
-    proposals: Map<message::Command<S::Command>, usize>,
+    proposals: BiMap<usize, message::Command<S::Command>>,
     backoff: f32,
     timeout: time::Duration,
 }
@@ -50,7 +51,7 @@ impl<S: state::State> Leader<S> {
                 b_id: 1,
                 l_id: id,
             },
-            proposals: Map::default(),
+            proposals: BiMap::default(),
             backoff: 100.0 * rand::random::<f32>(),
             timeout,
         };
@@ -59,46 +60,52 @@ impl<S: state::State> Leader<S> {
     }
 
     fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
-        if self.proposals.contains_key(&proposal.command) {
+        info!("Responding to proposal {:?} with proposals {:?}", proposal, self.proposals);
+        if self.proposals.contains_right(&proposal.command) {
             return
         }
-        self.proposals.insert(proposal.command.clone(), proposal.s_id);
+        self.proposals.insert(proposal.s_id, proposal.command.clone());
         if self.active {
             self.spawn_commander(proposal);
         }
     }
 
     fn respond_preempt(&mut self, ballot: message::BallotID) {
-        if ballot < self.ballot { return }
         self.active = false;
         self.ballot = message::BallotID {
             b_id: ballot.b_id + 1,
             l_id: self.id,
         };
         self.backoff *= 1.0 + rand::random::<f32>() / 2.0;
+        info!("backoff: {:?}", self.backoff);
         self.spawn_scout();
     }
 
     fn respond_adopt(&mut self, pvalues: Vec<message::PValue<S::Command>>) {
-        for (op, s_id) in Self::pmax(pvalues) {
-            self.proposals.insert(op, s_id);
-        }
         let proposals = std::mem::replace(
             &mut self.proposals,
-            Map::with_capacity(0)
+            Self::pmax(pvalues).collect(),
         );
-        for (command, s_id) in &proposals {
+
+        for (s_id, command) in proposals {
+            if !self.proposals.contains_left(&s_id) {
+                self.proposals.insert(s_id, command);
+            }
+        }
+        info!("{:?}", self.proposals);
+
+        for (s_id, command) in &self.proposals {
             let proposal = message::Proposal {
                 s_id: s_id.clone(),
                 command: command.clone(),
             };
             self.spawn_commander(proposal);
         }
-        self.proposals = proposals;
+
         self.active = true;
     }
 
-    fn pmax<I>(pvalues: I) -> impl Iterator<Item = (message::Command<S::Command>, usize)>
+    fn pmax<I>(pvalues: I) -> impl Iterator<Item = (usize, message::Command<S::Command>)>
         where I: IntoIterator<Item = message::PValue<S::Command>> {
         let mut pmax: Map<usize, (message::BallotID, message::Command<S::Command>)> = Map::default();
         for pvalue in pvalues.into_iter() {
@@ -111,7 +118,7 @@ impl<S: state::State> Leader<S> {
                 pmax.insert(pvalue.s_id, (pvalue.b_id, pvalue.command));
             }
         }
-        pmax.into_iter().map(|(s_id, (_, op))| (op, s_id))
+        pmax.into_iter().map(|(s_id, (_, command))| (s_id, command))
     }
 
     fn spawn_commander(&self, proposal: message::Proposal<S::Command>) {
@@ -148,7 +155,7 @@ impl<S: state::State> Future for Leader<S> {
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         while let Async::Ready(Some(message)) = self.self_rx.poll()? {
-            trace!("received message {:?}", message);
+            info!("received {:?}", message);
             match message {
             | In::Propose(proposal) => self.respond_propose(proposal),
             | In::Preempt(ballot) => self.respond_preempt(ballot),

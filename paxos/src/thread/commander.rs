@@ -38,6 +38,7 @@ impl<S: state::State> Commander<S> {
             s_id: pvalue.s_id,
         };
         shared_tx.write().connect_commander(id, self_tx);
+        info!("starting for {:?}", id);
         Commander {
             id,
             rx: self_rx,
@@ -65,7 +66,7 @@ impl<S: state::State> Commander<S> {
             s_id: self.pvalue.s_id,
             command: self.pvalue.command.clone(),
         };
-        debug!("{:?} decided", self.pvalue);
+        info!("{:?} decided", self.pvalue);
         self.shared_tx
             .read()
             .broadcast(peer::In::Decision(decide));
@@ -73,7 +74,7 @@ impl<S: state::State> Commander<S> {
 
     fn send_preempt(&self, b_id: message::BallotID) {
         let preempt = leader::In::Preempt::<S::Command>(b_id);
-        debug!("{:?} preempted", self.pvalue);
+        info!("{:?} preempted", self.pvalue);
         self.leader_tx
             .unbounded_send(preempt)
             .expect("[INTERNAL ERROR]: failed to send preempted");
@@ -98,6 +99,8 @@ impl<S: state::State> Future for Commander<S> {
             .poll()
             .map_err(|_| ())?
         {
+            debug!("received {:?}", p2b);
+
             // Commander has not been preempted
             if p2b.b_id == self.pvalue.b_id {
 
@@ -111,8 +114,7 @@ impl<S: state::State> Future for Commander<S> {
             }
 
             // Notify leader that we've been preempted
-            else {
-                debug_assert!(p2b.b_id > self.pvalue.b_id);
+            else if p2b.b_id > self.pvalue.b_id {
                 self.send_preempt(p2b.b_id);
                 return Ok(Async::Ready(()))
             }

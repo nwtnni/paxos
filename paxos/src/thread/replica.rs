@@ -100,7 +100,7 @@ impl<S: state::State> Future for Replica<S> {
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         while let Async::Ready(Some(message)) = self.rx.poll()? {
-            trace!("received message {:?}", message);
+            info!("received {:?}", message);
             match message {
             | In::Request(command) => self.respond_request(command),
             | In::Decision(proposal) => self.respond_decision(proposal),

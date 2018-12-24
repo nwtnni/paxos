@@ -26,7 +26,7 @@ impl<S: state::State> Future for Acceptor<S> {
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         while let Async::Ready(Some(message)) = self.rx.poll()? {
-            trace!("received message {:?}", message);
+            trace!("received {:?}", message);
             match message {
             | In::P1A(m) => self.send_p1a(m),
             | In::P2A(c_id, m) => self.send_p2a(c_id, m),
@@ -57,7 +57,7 @@ impl<S: state::State> Acceptor<S> {
                 .cloned()
                 .collect(),
         });
-        trace!("sending message {:?} to {}", p1b, ballot.l_id);
+        trace!("sending {:?} to {}", p1b, ballot.l_id);
         self.shared_tx.read().send(ballot.l_id, p1b)
     }
 
@@ -73,7 +73,7 @@ impl<S: state::State> Acceptor<S> {
                 b_id: self.ballot,
             }
         );
-        trace!("sending message {:?} to {}", p2b, pvalue.b_id.l_id);
+        trace!("sending {:?} to {}", p2b, pvalue.b_id.l_id);
         self.shared_tx.read().send(pvalue.b_id.l_id, p2b)
     }
 }

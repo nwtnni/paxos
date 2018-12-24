@@ -179,12 +179,14 @@ impl<S: state::State> Future for Peer<S> {
             .poll()
             .map_err(|_| ())?
         {
-            trace!("received message {:?}", message);
-            self.respond_incoming(message);
+            if let In::Ping(_) = &message {} else {
+                trace!("received {:?}", message);
+                self.respond_incoming(message);
+            }
         }
 
         while let Async::Ready(Some(message)) = self.rx.poll()? {
-            trace!("sending message {:?}", message);
+            trace!("sending {:?}", message);
             self.send(message).map_err(|_| ())?;
         }
 

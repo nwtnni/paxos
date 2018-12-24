@@ -82,7 +82,7 @@ impl<S: state::State> Future for Client<S> {
             .poll()
             .map_err(|_| ())?
         {
-            trace!("received command {:?}", message);
+            info!("received {:?}", message);
             self.replica_tx.unbounded_send(replica::In::Request(message))
                 .expect("[INTERNAL ERROR]: failed to send to replica")
         }
@@ -91,7 +91,6 @@ impl<S: state::State> Future for Client<S> {
             .poll()
             .map_err(|_| ())?
         {
-            trace!("sending message {:?} to {:?}", message, self.client_id);
             WriteBincode::new(&mut self.client_tx)
                 .send(message)
                 .wait()

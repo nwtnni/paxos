@@ -10,7 +10,7 @@
     { "type": "Put", "id": 0, "message": "a" },
     { "type": "Put", "id": 1, "message": "b" },
     { "type": "Put", "id": 2, "message": "c" },
-    { "type": "Sleep", "ms": 1000 },
+    { "type": "Sleep", "ms": 3000 },
     { "type": "Get", "id": 0 },
     { "type": "Get", "id": 1 },
     { "type": "Get", "id": 2 }
