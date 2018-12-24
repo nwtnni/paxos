@@ -1,4 +1,6 @@
-use hashbrown::HashMap as Map;
+use std::collections::HashMap as Map;
+
+use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 
 use crate::message;
@@ -6,6 +8,7 @@ use crate::thread::Rx;
 use crate::thread::peer;
 use crate::shared;
 use crate::state;
+use crate::storage;
 
 #[derive(Debug)]
 pub enum In<C: state::Command> {
@@ -15,10 +18,19 @@ pub enum In<C: state::Command> {
 
 pub struct Acceptor<S: state::State> {
     id: usize,
-    ballot: message::BallotID,
-    accepted: Map<usize, message::PValue<S::Command>>,
+    stable: Stable<S>,
+    storage: storage::Storage<Stable<S>>,
     rx: Rx<In<S::Command>>,
     shared_tx: shared::Shared<S>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(bound(serialize = "", deserialize = ""))]
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+struct Stable<S: state::State> {
+    ballot: message::BallotID,
+    accepted: Map<usize, message::PValue<S::Command>>,
 }
 
 impl<S: state::State> Future for Acceptor<S> {
@@ -39,21 +51,24 @@ impl<S: state::State> Future for Acceptor<S> {
 impl<S: state::State> Acceptor<S> {
 
     pub fn new(id: usize, rx: Rx<In<S::Command>>, shared_tx: shared::Shared<S>) -> Self {
+        let storage = storage::Storage::new(format!("acceptor-{:>02}.paxos", id));
+        let stable = storage.load().unwrap_or_default();
         Acceptor {
             id, 
-            ballot: message::BallotID::default(),
-            accepted: Map::default(),
+            stable,
+            storage,
             rx,
             shared_tx
         }
     }
 
     fn send_p1a(&mut self, ballot: message::P1A) {
-        self.ballot = std::cmp::max(ballot, self.ballot);
+        self.stable.ballot = std::cmp::max(ballot, self.stable.ballot);
+        self.storage.save(&self.stable);
         let p1b = peer::In::P1B(message::P1B {
             a_id: self.id,
-            b_id: self.ballot,
-            pvalues: self.accepted.values()
+            b_id: self.stable.ballot,
+            pvalues: self.stable.accepted.values()
                 .cloned()
                 .collect(),
         });
@@ -62,15 +77,16 @@ impl<S: state::State> Acceptor<S> {
     }
 
     fn send_p2a(&mut self, c_id: message::CommanderID, pvalue: message::P2A<S::Command>) {
-        if pvalue.b_id >= self.ballot {
-            self.ballot = pvalue.b_id;
-            self.accepted.insert(pvalue.s_id, pvalue.clone());
+        if pvalue.b_id >= self.stable.ballot {
+            self.stable.ballot = pvalue.b_id;
+            self.stable.accepted.insert(pvalue.s_id, pvalue.clone());
+            self.storage.save(&self.stable);
         }
         let p2b = peer::In::P2B(
             c_id,
             message::P2B {
                 a_id: self.id,
-                b_id: self.ballot,
+                b_id: self.stable.ballot,
             }
         );
         trace!("sending {:?} to {}", p2b, pvalue.b_id.l_id);

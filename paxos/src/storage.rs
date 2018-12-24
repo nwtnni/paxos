@@ -28,7 +28,7 @@ impl<S: serde::de::DeserializeOwned> Storage<S> {
 }
 
 impl<S: serde::Serialize> Storage<S> {
-    pub fn write(&mut self, state: &S) {
+    pub fn save(&mut self, state: &S) {
         self.storage.set_len(0)
             .expect("[STORAGE ERROR]: failed to trim file");
         self.storage.seek(std::io::SeekFrom::Start(0))
