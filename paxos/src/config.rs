@@ -74,6 +74,7 @@ impl<S: state::State> Config<S> {
         );
 
         let replica_thread = thread::replica::Replica::new(
+            self.id,
             leader_tx.clone(),
             shared_tx.clone(),
             replica_rx,
