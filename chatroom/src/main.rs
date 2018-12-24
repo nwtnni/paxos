@@ -20,11 +20,21 @@ struct Opt {
     /// Timeout between servers (in milliseconds)
     #[structopt(short = "t", long = "timeout", default_value = "1000")]
     timeout: u64,
+
+    /// Logging level
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbosity: u8,
 }
 
 fn main() {
     let opt = Opt::from_args();
     let id = opt.id;
+    let level = match opt.verbosity {
+    | 0 => log::LevelFilter::Off,
+    | 1 => log::LevelFilter::Info,
+    | 2 => log::LevelFilter::Debug,
+    | _ => log::LevelFilter::Trace,
+    };
 
     fern::Dispatch::new()
         .format(move |out, message, record| {
@@ -36,7 +46,7 @@ fn main() {
                 message
             ))
         })
-        .level_for("paxos", log::LevelFilter::Trace)
+        .level_for("paxos", level)
         .level_for("tokio_io", log::LevelFilter::Off)
         .level_for("tokio_threadpool", log::LevelFilter::Off)
         .level_for("tokio_reactor", log::LevelFilter::Off)

@@ -18,21 +18,42 @@ use crate::command::{Command, Execution};
 #[derive(StructOpt)]
 #[structopt(name = "harness")]
 struct Opt {
+    /// Paxos server binary
     #[structopt(short = "s", long = "server")]
     server: std::path::PathBuf,
 
+    /// Test file
     #[structopt(short = "f", long = "file")]
     file: std::path::PathBuf,
+
+    /// Logging output verbosity
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbose: u8,
 }
 
 struct Server(std::process::Child);
 
 impl Server {
-    fn new(path: &std::path::PathBuf, id: usize, port: usize, count: usize) -> Self {
-        std::process::Command::new(path)
-            .args(&["-i", &id.to_string()])
-            .args(&["-p", &port.to_string()])
-            .args(&["-c", &count.to_string()])
+    fn new(
+        path: &std::path::PathBuf,
+        id: usize,
+        port: usize,
+        count: usize,
+        verbose: u8,
+    ) -> Self {
+        let id = id.to_string();
+        let port = port.to_string();
+        let count = count.to_string();
+        let mut command = std::process::Command::new(path);
+
+        if verbose > 0 {
+            let verbosity = "-".to_string() + &"v".repeat(verbose as usize);
+            command.arg(&verbosity);
+        }
+
+        command.args(&["-i", &id])
+            .args(&["-p", &port])
+            .args(&["-c", &count])
             .spawn()
             .map(Server)
             .expect("[INTERNAL ERROR]: could not spawn server")
@@ -71,7 +92,7 @@ async fn run() {
         println!("Executing command {:?}", command);
         match command {
         | Command::Start { id, port, count } => {
-            servers.insert(id, Server::new(&opt.server, id, port, count));
+            servers.insert(id, Server::new(&opt.server, id, port, count, opt.verbose));
             ports.insert(id, port);
         }
         | Command::Connect { id } => {
