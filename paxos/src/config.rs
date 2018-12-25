@@ -1,3 +1,9 @@
+//! # Summary
+//!
+//! This module defines a single replicated Paxos server. A library
+//! user can create an instance of `Config` with a state implementation
+//! of their choice, and then call `run` to launch the Paxos server.
+
 use futures::sync::mpsc;
 use tokio::prelude::*;
 
@@ -7,6 +13,7 @@ use crate::thread;
 
 const INTERNAL_PORT: usize = 20000;
 
+/// Defines a single Paxos server with state type `S`.
 #[derive(Copy, Clone, Debug)]
 pub struct Config<S> {
     /// Unique replica ID
@@ -25,6 +32,9 @@ pub struct Config<S> {
 }
 
 impl<S: state::State> Config<S> {
+
+    /// Create a new server with unique ID `id`, out of a cluster
+    /// of `count` servers, listening on TCP port `port`.
     pub fn new(id: usize, port: usize, count: usize) -> Self {
         Config {
             id,
@@ -35,17 +45,20 @@ impl<S: state::State> Config<S> {
         }
     }
 
+    /// Configure timeout duration for detecting disconnected peers.
     pub fn with_timeout(mut self, timeout: std::time::Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
+    /// Launch server asynchronously.
     pub async fn run(self) {
         let (acceptor_tx, acceptor_rx) = mpsc::unbounded();
         let (leader_tx, leader_rx) = mpsc::unbounded();
         let (scout_tx, _) = mpsc::unbounded();
         let (replica_tx, replica_rx) = mpsc::unbounded();
 
+        // Listen for connections to other peer servers
         let mut internal_port = format!("127.0.0.1:{}", self.id + INTERNAL_PORT)
             .parse::<std::net::SocketAddr>()
             .map(|addr| tokio::net::tcp::TcpListener::bind(&addr))
@@ -53,6 +66,7 @@ impl<S: state::State> Config<S> {
             .expect("[INTERNAL ERROR]: failed to bind to socket")
             .incoming();
 
+        // Listen for connections to clients
         let mut external_port = format!("127.0.0.1:{}", self.port)
             .parse::<std::net::SocketAddr>()
             .map(|addr| tokio::net::tcp::TcpListener::bind(&addr))
@@ -60,6 +74,7 @@ impl<S: state::State> Config<S> {
             .expect("[INTERNAL ERROR]: failed to bind to socket")
             .incoming();
 
+        // Initialize message forwarding hub
         let shared_tx: shared::Shared<S> = shared::Shared::new(
             self.id,
             scout_tx,
@@ -89,6 +104,7 @@ impl<S: state::State> Config<S> {
             self.timeout,
         );
 
+        // Asynchronously listen for and create new server-to-server connections
         let acceptor = acceptor_tx.clone();
         let self_id = self.id;
         let timeout = self.timeout;
@@ -106,6 +122,7 @@ impl<S: state::State> Config<S> {
             }
         });
 
+        // Asynchronously listen for and create new server-to-client connections
         let shared = shared_tx.clone();
         tokio::spawn_async(async move {
             while let Some(Ok(stream)) = await!(external_port.next()) {
@@ -118,6 +135,7 @@ impl<S: state::State> Config<S> {
             }
         });
 
+        // Attempt to connect to all other servers directly on startup
         for peer_id in (0..self.count).filter(|id| *id != self_id) {
             let acceptor = acceptor_tx.clone();
             let shared = shared_tx.clone();
@@ -139,6 +157,7 @@ impl<S: state::State> Config<S> {
             tokio::spawn(connect);
         }
 
+        // Spawn persistent acceptor, replica, and leader threads
         tokio::spawn(acceptor_thread);
         tokio::spawn(replica_thread);
         tokio::spawn(leader_thread);
