@@ -1,3 +1,8 @@
+//! # Summary
+//!
+//! This module defines the `Commander` struct, which is responsible
+//! for proposing specific slot-command mappings to acceptors.
+
 use std::collections::HashSet as Set;
 
 use futures::sync::mpsc;
@@ -9,16 +14,33 @@ use crate::shared;
 use crate::state;
 use crate::thread::{leader, peer, Tx, Rx};
 
+/// Commanders can only receive P2B from acceptors.
 pub type In = message::P2B;
 
+/// Functions as command proposer.
 pub struct Commander<S: state::State> {
+    /// Unique ID of commander
     id: message::CommanderID,
+
+    /// Intra-server receiving channel
     rx: Rx<In>,
+
+    /// Intra-server leader transmitting channel
     leader_tx: Tx<leader::In<S::Command>>,
+
+    /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
+
+    /// Number of acceptors constituting a minority of all acceptors
     minority: usize,
+
+    /// PValue to propose to acceptors
     pvalue: message::PValue<S::Command>,
+
+    /// Interval at which to re-send P2A messages to unresponsive acceptors
     timeout: timer::Interval,
+
+    /// Acceptors that have yet to respond
     waiting: Set<usize>,
 }
 
@@ -57,6 +79,7 @@ impl<S: state::State> Commander<S> {
         commander
     }
 
+    /// Narrowcast P2A messages to all acceptors who haven't responded
     fn send_p2a(&self) {
         let p2a = peer::In::P2A(
             self.id,
@@ -67,6 +90,7 @@ impl<S: state::State> Commander<S> {
             .narrowcast(&self.waiting, p2a);
     }
 
+    /// Broadcast decisions to all replicas
     fn send_decide(&self) {
         let decide = message::Proposal {
             s_id: self.pvalue.s_id,
@@ -78,6 +102,7 @@ impl<S: state::State> Commander<S> {
             .broadcast(peer::In::Decision(decide));
     }
 
+    /// Notify leader that its ballot has been preempted
     fn send_preempt(&self, b_id: message::Ballot) {
         let preempt = leader::In::Preempt::<S::Command>(b_id);
         debug!("{:?} preempted", self.pvalue);
