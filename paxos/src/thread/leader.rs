@@ -1,3 +1,9 @@
+//! # Summary
+//!
+//! This module defines the `Leader` struct, which is responsible
+//! for vying for a majority of acceptors with a scout, and then 
+//! proposing commands to them via commanders.
+
 use std::collections::HashMap as Map;
 use std::time;
 
@@ -11,6 +17,9 @@ use crate::shared;
 use crate::state;
 use crate::storage;
 
+/// Leaders can only receive proposals from replicas,
+/// preempts from scouts or commanders, and adopts
+/// from scouts.
 #[derive(Debug)]
 pub enum In<C: state::Command> {
     Propose(message::Proposal<C>),
@@ -18,23 +27,48 @@ pub enum In<C: state::Command> {
     Adopt(Vec<message::PValue<C>>),
 }
 
+/// Functions as invariant-upholding command proposer.
 pub struct Leader<S: state::State> {
+    /// Unique ID of leader
     id: usize,
+
+    /// Intra-server receiving channel
     rx: Rx<In<S::Command>>,
+
+    /// Intra-server transmitting channel
     tx: Tx<In<S::Command>>,
+
+    /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
+
+    /// Adopted by a majority of acceptors and ready to spawn commanders
     active: bool,
+
+    /// Exponential backoff for spawning new scouts after preempts
     backoff: f32,
+
+    /// Total number of acceptors
     count: usize,
+
+    /// Time for scouts and commanders to wait before resending their messages
     timeout: time::Duration,
+
+    /// Persistent leader state across failures
     stable: Stable<S>,
+
+    /// Backing store for stable storage
     storage: storage::Storage<Stable<S>>,
 }
 
+/// Leaders need to keep track of their current ballot and the
+/// proposals they plan to propose to acceptors.
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 struct Stable<S: state::State> {
+    /// Leader's current ballot
     ballot: message::Ballot,
+
+    /// Planned proposals
     proposals: Map<usize, message::Command<S::Command>>,
 }
 
@@ -71,6 +105,8 @@ impl<S: state::State> Leader<S> {
         leader
     }
 
+    /// Add a new proposal to the map. Directly spawn commander for it if
+    /// we're already active.
     fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
         if self.stable.proposals.contains_key(&proposal.s_id) {
             return
@@ -83,6 +119,8 @@ impl<S: state::State> Leader<S> {
         }
     }
 
+    /// Update current ballot to out-compete preempted ballot. Apply
+    /// exponential backoff before spawning new scout.
     fn respond_preempt(&mut self, ballot: message::Ballot) {
         if ballot <= self.stable.ballot { return }
         debug!("preempted by {:?}", ballot);
@@ -96,6 +134,8 @@ impl<S: state::State> Leader<S> {
         self.spawn_scout();
     }
 
+    /// Update proposal map to uphold Paxos invariants before spawning commanders
+    /// for each proposal.
     fn respond_adopt(&mut self, pvalues: Vec<message::PValue<S::Command>>) {
         let proposals = std::mem::replace(
             &mut self.stable.proposals,
@@ -122,6 +162,8 @@ impl<S: state::State> Leader<S> {
         self.active = true;
     }
 
+    /// Calculate the most recently accepted commands for each slot to
+    /// uphold Paxos invariants.
     fn pmax<I>(pvalues: I) -> impl Iterator<Item = (usize, message::Command<S::Command>)>
         where I: IntoIterator<Item = message::PValue<S::Command>> {
         let mut pmax: Map<usize, (message::Ballot, message::Command<S::Command>)> = Map::default();
@@ -138,6 +180,7 @@ impl<S: state::State> Leader<S> {
         pmax.into_iter().map(|(s_id, (_, command))| (s_id, command))
     }
 
+    /// Spawn a new commander thread for the given proposal.
     fn spawn_commander(&self, proposal: message::Proposal<S::Command>) {
         let pvalue = message::PValue {
             s_id: proposal.s_id,
@@ -154,6 +197,7 @@ impl<S: state::State> Leader<S> {
         tokio::spawn(commander);
     }
 
+    /// Spawn a new scout thread for the current ballot.
     fn spawn_scout(&self) {
         let scout = scout::Scout::new(
             self.tx.clone(),
