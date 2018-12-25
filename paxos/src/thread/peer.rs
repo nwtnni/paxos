@@ -1,3 +1,8 @@
+//! # Summary
+//!
+//! This module defines external connections to other servers.
+//! Responsible for forwarding messages to and from connected servers.
+
 use futures::sync::mpsc;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
@@ -9,6 +14,10 @@ use crate::state;
 use crate::socket;
 use crate::thread::*;
 
+/// Peer servers can receive messages between
+/// scouts, commanders, and acceptors, decisions
+/// from commanders, and pings to detect failed
+/// servers.
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Clone(bound = ""))]
 #[serde(bound(serialize = "", deserialize = ""))]
@@ -21,12 +30,24 @@ pub enum In<C: state::Command> {
     Ping(usize),
 }
 
+/// Represents a peer that has not yet sent a ping, so we don't know its ID.
 pub struct Connecting<S: state::State> {
+    /// ID of the current server (not the peer)
     self_id: usize,
+
+    /// External peer receiving channel
     peer_rx: Option<socket::Rx<In<S::Command>>>,
+
+    /// External peer transmitting channel
     peer_tx: Option<socket::Tx<In<S::Command>>>,
+
+    /// Intra-server acceptor transmitting channel
     acceptor_tx: Option<Tx<acceptor::In<S::Command>>>,
+
+    /// Intra-server shared transmitting channels
     shared_tx: Option<Shared<S>>,
+
+    /// Ping interval for detecting failed connections
     timeout: std::time::Duration,
 }
 
@@ -57,6 +78,10 @@ impl<S: state::State> Future for Connecting<S> {
         while let Async::Ready(Some(message)) = self.peer_rx.as_mut().unwrap().poll()?  {
             match message {
             | In::Ping(peer_id) => {
+                // After we receiving a ping, we can read off the connected server's ID,
+                // register it with the shared transmission hub, and promote it to a
+                // Peer struct. Safe to unwrap here because we always initialize with Some
+                // and always return after moving out of the option.
                 info!("connected to {}", peer_id);
                 let (tx, rx) = mpsc::unbounded();
                 self.shared_tx.as_mut()
@@ -81,14 +106,31 @@ impl<S: state::State> Future for Connecting<S> {
     }
 }
 
+/// Represents a peer server with known ID that is registered
+/// with the shared transmission hub.
 pub struct Peer<S: state::State> {
+    /// ID of connected server
     peer_id: usize,
+
+    /// ID of this server
     self_id: usize,
+    
+    /// Intra-server receiving channel
     rx: Rx<In<S::Command>>,
+
+    /// External peer receiving channel
     peer_rx: socket::Rx<In<S::Command>>,
+
+    /// External peer transmitting channel
     peer_tx: socket::Tx<In<S::Command>>,
+
+    /// Intra-server acceptor transmitting channel
     acceptor_tx: Tx<acceptor::In<S::Command>>,
+
+    /// Intra-server shared transmitting channels
     shared_tx: Shared<S>,
+
+    /// Ping interval for detecting failed connections
     timeout: tokio::timer::Interval,
 }
 
@@ -119,6 +161,7 @@ impl<S: state::State> Peer<S> {
 }
 
 impl<S: state::State> Peer<S> {
+    /// Forward incoming messages to appropriate thread.
     fn respond_incoming(&self, message: In<S::Command>) {
         match message {
         | In::P1A(p1a) => {
@@ -131,22 +174,7 @@ impl<S: state::State> Peer<S> {
                 .unbounded_send(acceptor::In::P2A(c_id, p2a))
                 .expect("[INTERNAL ERROR]: failed to send to acceptor");
         }
-        | In::P1B(p1b) => {
-            self.shared_tx
-                .read()
-                .send_scout(p1b);
-        }
-        | In::P2B(c_id, p2b) => {
-            self.shared_tx
-                .read()
-                .send_commander(c_id, p2b);
-        }
-        | In::Decision(proposal) => {
-            self.shared_tx
-                .read()
-                .send_replica(replica::In::Decision(proposal));
-        }
-        | In::Ping(_) => (),
+        | message => self.shared_tx.read().forward(message),
         }
     }
 }

@@ -152,7 +152,7 @@ impl<S: state::State> State<S> {
     }
 
     /// Forwards a message within this process.
-    fn forward(&self, message: peer::In<S::Command>) {
+    pub fn forward(&self, message: peer::In<S::Command>) {
         match message {
         | peer::In::P1A(p1a) => self.send_acceptor(acceptor::In::P1A(p1a)),
         | peer::In::P1B(p1b) => self.send_scout(p1b),

@@ -97,6 +97,7 @@
 //!
 //! - Acceptors, replicas, and leaders are all co-located
 //! - Acceptors only keep track of the most recently accepted `PValue` per slot
+//! - Leaders use exponential backoff for new scouts when preempted
 //!
 //! [1]: http://paxos.systems/index.html
 
