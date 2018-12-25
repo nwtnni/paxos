@@ -4,7 +4,6 @@
 extern crate tokio;
 
 use std::collections::HashMap as Map;
-use std::sync::{Arc, atomic};
 
 use structopt::StructOpt;
 use tokio::prelude::*;
@@ -85,8 +84,8 @@ async fn run() {
     // Server ports
     let mut ports: Map<usize, usize> = Map::default();
 
-    // Operation identifier
-    let operations: Arc<atomic::AtomicUsize> = Arc::new(atomic::AtomicUsize::new(0));
+    // Local command identifier
+    let mut counter = 0;
 
     for command in execution.0 {
         println!("Executing command {:?}", command);
@@ -109,15 +108,14 @@ async fn run() {
         }
         | Command::Get { id } => {
             let writer = connections[&id].try_clone().unwrap();
-            let counter = operations.clone();
             let client_id = id;
-            let local_id = counter.fetch_add(1, atomic::Ordering::SeqCst);
             let command = chatroom::Command {
                 client_id,
-                local_id,
+                local_id: counter,
                 mode: chatroom::Mode::Get,
             };
 
+            counter += 1;
             tokio::spawn_async(async {
                 let writer = WriteBincode::new(
                     codec::length_delimited::Builder::new()
@@ -139,15 +137,14 @@ async fn run() {
         }
         | Command::Put { id, message } => {
             let writer = connections[&id].try_clone().unwrap();
-            let counter = operations.clone();
             let client_id = id;
-            let local_id = counter.fetch_add(1, atomic::Ordering::SeqCst);
             let command = chatroom::Command {
                 client_id,
-                local_id,
+                local_id: counter,
                 mode: chatroom::Mode::Put(message),
             };
 
+            counter += 1;
             tokio::spawn_async(async move {
                 let writer = WriteBincode::new(
                     codec::length_delimited::Builder::new()
