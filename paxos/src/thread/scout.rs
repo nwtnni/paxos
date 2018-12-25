@@ -1,3 +1,10 @@
+//! # Summary
+//!
+//! This module implements the `Scout` struct, which is responsible
+//! for proposing ballots to acceptors. Once its ballot has been
+//! adopted by a majority of acceptors, its leader is free to begin
+//! proposing according to the PValues the scout has collected.
+
 use std::collections::HashSet as Set;
 use std::time;
 
@@ -10,17 +17,37 @@ use crate::shared;
 use crate::state;
 use crate::thread::{leader, peer, Tx, Rx};
 
+/// Scouts can only receive P1B from acceptors.
 pub type In<C> = message::P1B<C>;
 
+/// Competes with other scouts for adoption by
+/// a majority of acceptors.
 pub struct Scout<S: state::State> {
+    /// Intra-server receiving channel
     rx: Rx<In<S::Command>>,
+
+    /// Intra-server leader transmitting channel
     leader_tx: Tx<leader::In<S::Command>>,
+
+    /// Intra-server shared transmitting channel
     shared_tx: shared::Shared<S>,
+
+    /// Associated ballot
     ballot: message::Ballot,
+
+    /// Latest known decision
     decided: Option<usize>,
+
+    /// Number of acceptors constituting a minority of all acceptors
     minority: usize,
+
+    /// Latest PValues accepted by contacted acceptors
     pvalues: Set<message::PValue<S::Command>>,
+
+    /// Interval at which to re-send P1A messages to unresponsive acceptors
     timeout: timer::Interval,
+
+    /// Acceptors that have yet to respond
     waiting: Set<usize>,
 }
 
@@ -57,6 +84,7 @@ impl<S: state::State> Scout<S> {
         }
     }
 
+    /// Narrowcast P1A messages to all acceptors who haven't responded
     fn send_p1a(&self) {
         let p1a = peer::In::P1A::<S::Command>(message::P1A {
             b_id: self.ballot,
@@ -67,6 +95,7 @@ impl<S: state::State> Scout<S> {
             .narrowcast(&self.waiting, p1a);
     }
 
+    /// Inform leader that its ballot has been adopted by a majority of acceptors
     fn send_adopt(&mut self) {
         debug!("{:?} adopted", self.ballot);
         let pvalues = std::mem::replace(&mut self.pvalues, Set::with_capacity(0))
@@ -78,6 +107,7 @@ impl<S: state::State> Scout<S> {
             .expect("[INTERNAL ERROR]: failed to send adopt");
     }
 
+    /// Notify leader that its ballot has been preempted
     fn send_preempt(&self, b_id: message::Ballot) {
         debug!("{:?} preempted by {:?}", self.ballot, b_id);
         let preempt = leader::In::Preempt::<S::Command>(b_id);
