@@ -36,7 +36,7 @@ fn usage() {
         "connect <PORT> | c <PORT>  -- Connect to server at <PORT>\n",
         "disconnect     | d         -- Disconnect from current server\n",
         "get            | g         -- Get chat log from current server\n",
-        "put <MSG>      | p <MSG>   -- Write message to current server\n",
+        "put <MSG>      | p <MSG>   -- Write <MSG> to current server\n",
         "--------------------------------------------------------------",
     );
 }
@@ -44,7 +44,7 @@ fn usage() {
 impl std::str::FromStr for Command {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut iter = s.trim().split_whitespace();
+        let mut iter = s.trim().splitn(2, " ");
         match iter.next() {
         | Some("help") | Some("h") => Ok(Command::Help),
         | Some("get") | Some("g") => Ok(Command::Get),
