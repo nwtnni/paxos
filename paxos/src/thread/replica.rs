@@ -154,6 +154,7 @@ impl<S: state::State> Replica<S> {
 
         // Update stable state and notify leader of decision
         let decide = leader::In::Decide(self.stable.decision_slot);
+        self.stable.proposals.remove(&self.stable.decision_slot);
         self.stable.decision_slot += 1;
         self.storage.save(&self.stable);
         self.leader_tx.unbounded_send(decide)
