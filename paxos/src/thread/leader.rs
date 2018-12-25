@@ -14,7 +14,7 @@ use crate::storage;
 #[derive(Debug)]
 pub enum In<C: state::Command> {
     Propose(message::Proposal<C>),
-    Preempt(message::BallotID),
+    Preempt(message::Ballot),
     Adopt(Vec<message::PValue<C>>),
 }
 
@@ -34,7 +34,7 @@ pub struct Leader<S: state::State> {
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 struct Stable<S: state::State> {
-    ballot: message::BallotID,
+    ballot: message::Ballot,
     proposals: Map<usize, message::Command<S::Command>>,
 }
 
@@ -51,7 +51,7 @@ impl<S: state::State> Leader<S> {
         let storage = storage::Storage::new(format!("leader-{:>02}.paxos", id));
         let stable = storage.load()
             .unwrap_or(Stable {
-                ballot: message::BallotID { b_id: 1, l_id: id }, 
+                ballot: message::Ballot { b_id: 1, l_id: id }, 
                 proposals: Map::default(), 
             });
 
@@ -83,11 +83,11 @@ impl<S: state::State> Leader<S> {
         }
     }
 
-    fn respond_preempt(&mut self, ballot: message::BallotID) {
+    fn respond_preempt(&mut self, ballot: message::Ballot) {
         if ballot <= self.stable.ballot { return }
         debug!("preempted by {:?}", ballot);
         self.active = false;
-        self.stable.ballot = message::BallotID {
+        self.stable.ballot = message::Ballot {
             b_id: ballot.b_id + 1,
             l_id: self.id,
         };
@@ -124,7 +124,7 @@ impl<S: state::State> Leader<S> {
 
     fn pmax<I>(pvalues: I) -> impl Iterator<Item = (usize, message::Command<S::Command>)>
         where I: IntoIterator<Item = message::PValue<S::Command>> {
-        let mut pmax: Map<usize, (message::BallotID, message::Command<S::Command>)> = Map::default();
+        let mut pmax: Map<usize, (message::Ballot, message::Command<S::Command>)> = Map::default();
         for pvalue in pvalues.into_iter() {
             if let Some((b_id, command)) = pmax.get_mut(&pvalue.s_id) {
                 if pvalue.b_id > *b_id {

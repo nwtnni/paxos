@@ -78,7 +78,7 @@ impl<S: state::State> Commander<S> {
             .broadcast(peer::In::Decision(decide));
     }
 
-    fn send_preempt(&self, b_id: message::BallotID) {
+    fn send_preempt(&self, b_id: message::Ballot) {
         let preempt = leader::In::Preempt::<S::Command>(b_id);
         debug!("{:?} preempted", self.pvalue);
         self.leader_tx

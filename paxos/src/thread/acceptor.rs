@@ -29,7 +29,7 @@ pub struct Acceptor<S: state::State> {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 struct Stable<S: state::State> {
-    ballot: message::BallotID,
+    ballot: message::Ballot,
     accepted: Map<usize, message::PValue<S::Command>>,
 }
 

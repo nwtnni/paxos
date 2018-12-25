@@ -2,6 +2,9 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::state;
 
+/// Wrapper around `state::Command` that defines
+/// equality based on a command's client ID and
+/// its client-local ID.
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 #[derive(Clone, Debug)]
@@ -42,56 +45,77 @@ impl<C: state::Command> std::ops::Deref for Command<C> {
     }
 }
 
+/// A ballot is uniquely determined by its leader's ID
+/// and its local sequence number.
 #[derive(Serialize, Deserialize)]
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BallotID {
+pub struct Ballot {
+    /// Leader-local sequence number
     pub b_id: usize,
+    /// Leader ID
     pub l_id: usize,
 }
 
+/// A commander is uniquely determined by its leader's ballot
+/// when it was created and the slot it is targeting.
 #[derive(Serialize, Deserialize)]
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CommanderID {
-    pub b_id: BallotID,
+    /// Associated ballot
+    pub b_id: Ballot,
+    /// Targeted slot
     pub s_id: usize,
 }
 
+/// Represents a proposed binding from slot to command using the associated ballot.
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
 pub struct PValue<C: state::Command> {
+    /// Targeted slot
     pub s_id: usize,
-    pub b_id: BallotID,
+    /// Associated ballot
+    pub b_id: Ballot,
+    /// Proposed command
     pub command: Command<C>,
 }
 
-pub type P1A = BallotID;
+/// Query from scout to acceptor.
+pub type P1A = Ballot;
 
-pub type P2A<C> = PValue<C>;
-
+/// Response from acceptor to scout.
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
 pub struct P1B<C: state::Command> {
     pub a_id: usize,
-    pub b_id: BallotID,
+    pub b_id: Ballot,
     pub pvalues: Vec<PValue<C>>,
 }
 
+/// Query from commander to acceptor.
+pub type P2A<C> = PValue<C>;
+
+/// Response from acceptor to commander.
 #[derive(Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct P2B {
+    /// Acceptor ID
     pub a_id: usize,
-    pub b_id: BallotID,
+    /// Acceptor's currently adopted ballot
+    pub b_id: Ballot,
 }
 
+/// Represents a proposed binding from slot to command.
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
 pub struct Proposal<C: state::Command> {
+    /// Targeted slot
     pub s_id: usize,
+    /// Proposed command
     pub command: Command<C>,
 }

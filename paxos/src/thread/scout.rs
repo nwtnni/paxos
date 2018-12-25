@@ -18,7 +18,7 @@ pub struct Scout<S: state::State> {
     shared_tx: shared::Shared<S>,
     waiting: Set<usize>,
     minority: usize,
-    ballot: message::BallotID,
+    ballot: message::Ballot,
     pvalues: Set<message::PValue<S::Command>>,
     timeout: timer::Interval,
 }
@@ -27,7 +27,7 @@ impl<S: state::State> Scout<S> {
     pub fn new(
         leader_tx: Tx<leader::In<S::Command>>,
         shared_tx: shared::Shared<S>,
-        ballot: message::BallotID,
+        ballot: message::Ballot,
         count: usize,
         delay: time::Duration,
         timeout: time::Duration,
@@ -72,7 +72,7 @@ impl<S: state::State> Scout<S> {
             .expect("[INTERNAL ERROR]: failed to send adopt");
     }
 
-    fn send_preempt(&self, b_id: message::BallotID) {
+    fn send_preempt(&self, b_id: message::Ballot) {
         debug!("{:?} preempted by {:?}", self.ballot, b_id);
         let preempt = leader::In::Preempt::<S::Command>(b_id);
         self.leader_tx
