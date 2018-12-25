@@ -3,7 +3,7 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
-#[structopt(name = "chatroom")]
+#[structopt(name = "chatroom-server")]
 struct Opt {
     /// Unique server ID
     #[structopt(short = "i", long = "id")]

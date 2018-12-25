@@ -13,3 +13,11 @@ tokio = "0.1.13"
 tokio-async-await = "0.1.4"
 log = "0.4.6"
 fern = "0.5.7"
+
+[[bin]]
+name = "chatroom-server"
+path = "src/server.rs"
+
+[[bin]]
+name = "chatroom-client"
+path = "src/client.rs"

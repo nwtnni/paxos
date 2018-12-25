@@ -23,7 +23,8 @@
 //! Currently, servers listen for clients using TCP streams, and communicate using
 //! length-delimited `bincode`-encoded Rust data. For convenience, `Sink` and `Stream`
 //! implementations of the receiving and transmitting wrappers around `TcpStream`
-//! are exposed as `Rx<T>` and `Tx<T>`, respectively.
+//! are exposed as `socket::Rx<T>` and `socket::Tx<T>`, respectively, and they
+//! can be created from a Tokio `TcpStream` using `socket::split`.
 //!
 //! # Example
 //!
@@ -111,10 +112,9 @@ mod config;
 mod message;
 mod state;
 mod shared;
-mod socket;
+pub mod socket;
 mod storage;
 mod thread;
 
 pub use crate::config::Config;
 pub use crate::state::{Identifier, Command, Response, State};
-pub use crate::socket::{Rx, Tx};
