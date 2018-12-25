@@ -1,3 +1,8 @@
+//! # Summary
+//!
+//! This module defines external connections to clients.
+//! Responsible for forwarding messages to and from connected clients.
+
 use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::net;
@@ -8,10 +13,18 @@ use crate::state;
 use crate::state::Command;
 use crate::thread::{Rx, Tx, replica};
 
+/// Represents a client that has not yet sent a message, so we don't know its ID.
 pub struct Connecting<S: state::State> {
+    /// External client receiving channel
     client_rx: Option<socket::Rx<S::Command>>,
+
+    /// External client transmitting channel
     client_tx: Option<socket::Tx<S::Response>>,
+
+    /// Intra-server replica transmitting channel
     replica_tx: Option<Tx<replica::In<S::Command>>>,
+    
+    /// Intra-server shared transmitting channels
     shared_tx: Option<shared::Shared<S>>,
 }
 
@@ -36,6 +49,11 @@ impl<S: state::State> Future for Connecting<S> {
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         while let Async::Ready(Some(message)) = self.client_rx.as_mut().unwrap().poll()?  {
+            // After we receive a message, we can read off the client's ID,
+            // register it with the shared transmission hub, and
+            // promote it to a Client struct. Safe to unwrap here because
+            // we always initialize with Some, and always return after moving
+            // out of the option.
             info!("connected to {:?}", message.client_id());
             let client_id = message.client_id();
             let (tx, rx) = mpsc::unbounded();
@@ -60,12 +78,25 @@ impl<S: state::State> Future for Connecting<S> {
     }
 }
 
+/// Represents a client with known ID that is registered with
+/// the shared transmission hub.
 pub struct Client<S: state::State> {
+    /// Intra-server receiving channel
     rx: Rx<S::Response>,
+
+    /// Client ID
     client_id: <S::Command as state::Command>::ClientID,
+
+    /// External client receiving channel
     client_rx: socket::Rx<S::Command>,
+
+    /// External client transmitting channel
     client_tx: socket::Tx<S::Response>,
+
+    /// Intra-server replica transmitting channel
     replica_tx: Tx<replica::In<S::Command>>,
+
+    /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
 }
 

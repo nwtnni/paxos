@@ -28,10 +28,10 @@ pub struct Acceptor<S: state::State> {
     /// Unique ID of acceptor
     id: usize,
 
-    /// Intra-process receiving channel
+    /// Intra-server receiving channel
     rx: Rx<In<S::Command>>,
 
-    /// Shared transmission channels
+    /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
 
     /// Persistent acceptor state across failures

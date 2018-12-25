@@ -19,8 +19,8 @@ pub(crate) mod scout;
 
 use futures::sync::mpsc;
 
-/// Convenience type synonym for intra-process message sending.
+/// Convenience type synonym for intra-server message sending.
 pub(crate) type Tx<T> = mpsc::UnboundedSender<T>;
 
-/// Convenience type synonym for intra-process message receiving.
+/// Convenience type synonym for intra-server message receiving.
 pub(crate) type Rx<T> = mpsc::UnboundedReceiver<T>;
