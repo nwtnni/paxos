@@ -1,3 +1,14 @@
+//! # Summary
+//!
+//! This module contains all of the necessary sub-threads for the Paxos protocol.
+//!
+//! With the exception of `client`, which handles message forwarding between server
+//! and client, and `peer`, which handles message forwarding between servers, each
+//! module directly correlates to a sub-thread described in
+//! [Paxos Made Moderately Complex][1], which this implementation is based on.
+//!
+//! [1]: http://paxos.systems/index.html
+
 pub(crate) mod acceptor;
 pub(crate) mod client;
 pub(crate) mod commander;
@@ -8,5 +19,8 @@ pub(crate) mod scout;
 
 use futures::sync::mpsc;
 
-pub type Tx<T> = mpsc::UnboundedSender<T>;
-pub type Rx<T> = mpsc::UnboundedReceiver<T>;
+/// Convenience type synonym for intra-process message sending.
+pub(crate) type Tx<T> = mpsc::UnboundedSender<T>;
+
+/// Convenience type synonym for intra-process message receiving.
+pub(crate) type Rx<T> = mpsc::UnboundedReceiver<T>;
