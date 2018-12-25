@@ -1,9 +1,13 @@
+//! # Summary
+//!
+//! This module defines several traits that together define a state machine,
+//! which the Paxos protocol then replicates. Library users must implement
+//! the `State` trait for their state machine, and then create a `paxos`
+//! instance using the `config` module.
+
 /// Unique identifier
 pub trait Identifier: std::hash::Hash
     + std::fmt::Debug
-    + std::marker::Unpin
-    + serde::Serialize
-    + serde::de::DeserializeOwned
     + Clone
     + Eq
     + Send
@@ -13,9 +17,6 @@ pub trait Identifier: std::hash::Hash
 
 impl<T> Identifier for T where T: std::hash::Hash
     + std::fmt::Debug
-    + std::marker::Unpin
-    + serde::Serialize
-    + serde::de::DeserializeOwned
     + Clone
     + Eq
     + Send
@@ -27,7 +28,6 @@ impl<T> Identifier for T where T: std::hash::Hash
 pub trait Command: Send
     + Clone
     + std::fmt::Debug
-    + std::marker::Unpin
     + serde::Serialize
     + serde::de::DeserializeOwned
 {
@@ -41,14 +41,12 @@ pub trait Command: Send
 pub trait Response: Send
     + std::fmt::Debug
     + serde::Serialize
-    + serde::de::DeserializeOwned
 {
 }
 
 impl<T> Response for T where T: Send
     + std::fmt::Debug
     + serde::Serialize
-    + serde::de::DeserializeOwned
 {
 }
 
