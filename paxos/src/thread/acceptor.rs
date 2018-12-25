@@ -18,10 +18,10 @@ pub enum In<C: state::Command> {
 
 pub struct Acceptor<S: state::State> {
     id: usize,
-    stable: Stable<S>,
-    storage: storage::Storage<Stable<S>>,
     rx: Rx<In<S::Command>>,
     shared_tx: shared::Shared<S>,
+    stable: Stable<S>,
+    storage: storage::Storage<Stable<S>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -51,7 +51,8 @@ impl<S: state::State> Future for Acceptor<S> {
 impl<S: state::State> Acceptor<S> {
 
     pub fn new(id: usize, rx: Rx<In<S::Command>>, shared_tx: shared::Shared<S>) -> Self {
-        let storage = storage::Storage::new(format!("acceptor-{:>02}.paxos", id));
+        let storage_file = format!("acceptor-{:>02}.paxos", id);
+        let storage = storage::Storage::new(storage_file);
         let stable = storage.load().unwrap_or_default();
         Acceptor {
             id, 

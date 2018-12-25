@@ -61,12 +61,12 @@ impl<S: state::State> Future for Connecting<S> {
 }
 
 pub struct Client<S: state::State> {
+    rx: Rx<S::Response>,
     client_id: <S::Command as state::Command>::ClientID,
     client_rx: socket::Rx<S::Command>,
     client_tx: socket::Tx<S::Response>,
     replica_tx: Tx<replica::In<S::Command>>,
     shared_tx: shared::Shared<S>,
-    rx: Rx<S::Response>,
 }
 
 impl<S: state::State> Future for Client<S> {

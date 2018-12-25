@@ -17,12 +17,12 @@ pub enum In<C: state::Command> {
 }
 
 pub struct Replica<S: state::State> {
+    rx: Rx<In<S::Command>>,
     leader_tx: Tx<leader::In<S::Command>>,
     shared_tx: shared::Shared<S>,
-    rx: Rx<In<S::Command>>,
-    state: S,
     stable: Stable<S>,
     storage: storage::Storage<Stable<S>>,
+    state: S,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,23 +30,21 @@ pub struct Replica<S: state::State> {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 struct Stable<S: state::State> {
-    decision_slot: usize,
     proposal_slot: usize,
+    decision_slot: usize,
     proposals: Map<usize, message::Command<S::Command>>,
     decisions: Map<usize, message::Command<S::Command>>,
 }
 
 impl<S: state::State> Replica<S> {
     pub fn new(
-        self_id: usize,
+        id: usize,
         leader_tx: Tx<leader::In<S::Command>>,
         shared_tx: shared::Shared<S>,
         rx: Rx<In<S::Command>>,
     ) -> Self {
-
-        let storage: storage::Storage<Stable<S>> = storage::Storage::new(
-            format!("replica-{:>02}.paxos", self_id)
-        );
+        let storage_file = format!("replica-{:>02}.paxos", id);
+        let storage: storage::Storage<Stable<S>> = storage::Storage::new(storage_file);
         let stable = storage.load().unwrap_or_default();
         let mut state = S::default();
 

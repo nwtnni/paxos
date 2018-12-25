@@ -16,10 +16,10 @@ pub struct Commander<S: state::State> {
     rx: Rx<In>,
     leader_tx: Tx<leader::In<S::Command>>,
     shared_tx: shared::Shared<S>,
-    waiting: Set<usize>,
     minority: usize,
     pvalue: message::PValue<S::Command>,
     timeout: timer::Interval,
+    waiting: Set<usize>,
 }
 
 impl<S: state::State> Commander<S> {

@@ -20,15 +20,15 @@ pub enum In<C: state::Command> {
 
 pub struct Leader<S: state::State> {
     id: usize,
-    count: usize,
-    self_rx: Rx<In<S::Command>>,
-    self_tx: Tx<In<S::Command>>,
+    rx: Rx<In<S::Command>>,
+    tx: Tx<In<S::Command>>,
     shared_tx: shared::Shared<S>,
     active: bool,
     backoff: f32,
+    count: usize,
+    timeout: time::Duration,
     stable: Stable<S>,
     storage: storage::Storage<Stable<S>>,
-    timeout: time::Duration,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -43,23 +43,23 @@ impl<S: state::State> Leader<S> {
     pub fn new(
         id: usize,
         count: usize,
-        self_rx: Rx<In<S::Command>>,
-        self_tx: Tx<In<S::Command>>,
+        rx: Rx<In<S::Command>>,
+        tx: Tx<In<S::Command>>,
         shared_tx: shared::Shared<S>,
         timeout: time::Duration,
     ) -> Self {
-        let storage = storage::Storage::new(format!("leader-{:>02}.paxos", id));
+        let storage_file = format!("leader-{:>02}.paxos", id);
+        let storage = storage::Storage::new(storage_file);
         let stable = storage.load()
             .unwrap_or(Stable {
                 ballot: message::Ballot { b_id: 1, l_id: id }, 
                 proposals: Map::default(), 
             });
-
         let leader = Leader {
             id,
             count,
-            self_rx,
-            self_tx,
+            rx,
+            tx,
             shared_tx,
             active: false,
             backoff: 100.0 * rand::random::<f32>(),
@@ -145,7 +145,7 @@ impl<S: state::State> Leader<S> {
             command: proposal.command,
         };
         let commander = commander::Commander::new(
-            self.self_tx.clone(),
+            self.tx.clone(),
             self.shared_tx.clone(),
             pvalue,
             self.count,
@@ -156,7 +156,7 @@ impl<S: state::State> Leader<S> {
 
     fn spawn_scout(&self) {
         let scout = scout::Scout::new(
-            self.self_tx.clone(),
+            self.tx.clone(),
             self.shared_tx.clone(),
             self.stable.ballot,
             self.count,
@@ -171,7 +171,7 @@ impl<S: state::State> Future for Leader<S> {
     type Item = ();
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        while let Async::Ready(Some(message)) = self.self_rx.poll()? {
+        while let Async::Ready(Some(message)) = self.rx.poll()? {
             debug!("received {:?}", message);
             match message {
             | In::Propose(proposal) => self.respond_propose(proposal),

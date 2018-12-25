@@ -13,13 +13,13 @@ pub struct Shared<S: state::State>(Arc<RwLock<State<S>>>);
 
 impl<S: state::State> Shared<S> {
     pub fn new(
-        self_id: usize,
+        id: usize,
         scout_tx: Tx<scout::In<S::Command>>,
         replica_tx: Tx<replica::In<S::Command>>,
         acceptor_tx: Tx<acceptor::In<S::Command>>,
     ) -> Self {
         Shared(Arc::new(RwLock::new(
-            State::new(self_id, scout_tx, replica_tx, acceptor_tx)
+            State::new(id, scout_tx, replica_tx, acceptor_tx)
         )))
     }
 
@@ -33,7 +33,7 @@ impl<S: state::State> Shared<S> {
 }
 
 pub struct State<S: state::State> {
-    self_id: usize,
+    id: usize,
     peer_txs: Map<usize, Tx<peer::In<S::Command>>>,
     client_txs: Map<<S::Command as state::Command>::ClientID, Tx<S::Response>>,
     commander_txs: Map<message::CommanderID, Tx<commander::In>>,
@@ -44,13 +44,13 @@ pub struct State<S: state::State> {
 
 impl<S: state::State> State<S> {
     pub fn new(
-        self_id: usize,
+        id: usize,
         scout_tx: Tx<scout::In<S::Command>>,
         replica_tx: Tx<replica::In<S::Command>>,
         acceptor_tx: Tx<acceptor::In<S::Command>>,
     ) -> Self {
         State {
-            self_id,
+            id,
             peer_txs: Map::default(),
             client_txs: Map::default(),
             commander_txs: Map::default(),
@@ -117,7 +117,7 @@ impl<S: state::State> State<S> {
     }
 
     pub fn send(&self, id: usize, message: peer::In<S::Command>) {
-        if id == self.self_id {
+        if id == self.id {
             self.forward(message);
         } else if let Some(tx) = self.peer_txs.get(&id) {
             let _ = tx.unbounded_send(message);
