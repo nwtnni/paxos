@@ -19,9 +19,9 @@ type WriteTcp = io::WriteHalf<net::TcpStream>;
 pub struct Rx<T>(ReadBincode<stream::FromErr<FramedRead<ReadTcp, LengthDelimitedCodec>, bincode::Error>, T>);
 pub struct Tx<T>(WriteBincode<sink::SinkFromErr<FramedWrite<WriteTcp, LengthDelimitedCodec>, bincode::Error>, T>);
 
-pub fn split<T, R>(stream: net::TcpStream) -> (Rx<R>, Tx<T>)
-where T: serde::Serialize,
-      R: serde::de::DeserializeOwned,
+pub fn split<R, T>(stream: net::TcpStream) -> (Rx<R>, Tx<T>)
+where R: serde::de::DeserializeOwned,
+      T: serde::Serialize,
 {
     let (rx, tx) = stream.split();
     let rx = length_delimited::Builder::new()
@@ -33,8 +33,8 @@ where T: serde::Serialize,
     (Rx(ReadBincode::new(rx)), Tx(WriteBincode::new(tx)))
 }
 
-impl<T: serde::de::DeserializeOwned> Stream for Rx<T> {
-    type Item = T;
+impl<R: serde::de::DeserializeOwned> Stream for Rx<R> {
+    type Item = R;
     type Error = ();
 
     #[inline]
