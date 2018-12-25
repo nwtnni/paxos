@@ -127,17 +127,13 @@ async fn run() {
                 let _ = await!(writer.send(command));
             });
 
-            let reader = ReadBincode::new(
+            let mut reader = ReadBincode::new(
                 codec::length_delimited::Builder::new()
                     .new_read(&connections[&id])
                     .from_err::<bincode::Error>()
             );
 
-            let (response, _) = await!(reader.into_future())
-                .map_err(|_| ())
-                .unwrap();
-
-            if let Some(chatroom::Response::Messages(messages)) = response {
+            if let Some(Ok(chatroom::Response::Messages(messages))) = await!(reader.next()) {
                 println!("Client {} received message log {:?}", id, messages);
             }
         }
