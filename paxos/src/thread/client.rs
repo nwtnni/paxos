@@ -35,11 +35,7 @@ impl<S: state::State> Future for Connecting<S> {
     type Item = Client<S>;
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        while let Async::Ready(Some(message)) = self.client_rx.as_mut()
-            .unwrap()
-            .poll()
-            .map_err(|_| ())?
-        {
+        while let Async::Ready(Some(message)) = self.client_rx.as_mut().unwrap().poll()?  {
             info!("connected to {:?}", message.client_id());
             let client_id = message.client_id();
             let (tx, rx) = mpsc::unbounded();
@@ -79,20 +75,20 @@ impl<S: state::State> Future for Client<S> {
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
 
         // Forward incoming requests
-        while let Async::Ready(Some(message)) = self.client_rx.poll().map_err(|_| ())?  {
+        while let Async::Ready(Some(message)) = self.client_rx.poll()?  {
             trace!("received {:?}", message);
             self.replica_tx.unbounded_send(replica::In::Request(message))
                 .expect("[INTERNAL ERROR]: failed to send to replica")
         }
 
         // Forward outgoing responses
-        while let Async::Ready(Some(message)) = self.rx.poll().map_err(|_| ())?  {
+        while let Async::Ready(Some(message)) = self.rx.poll()?  {
             trace!("sending {:?}", message);
             self.client_tx.start_send(message).map_err(|_| ())?;
         }
 
         // Complete sends
-        if let Async::NotReady = self.client_tx.poll_complete().map_err(|_| ())? {
+        if let Async::NotReady = self.client_tx.poll_complete()? {
             return Ok(Async::NotReady)
         }
 

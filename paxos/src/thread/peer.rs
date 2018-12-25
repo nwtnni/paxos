@@ -54,11 +54,7 @@ impl<S: state::State> Future for Connecting<S> {
     type Item = Peer<S>;
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        while let Async::Ready(Some(message)) = self.peer_rx.as_mut()
-            .unwrap()
-            .poll()
-            .map_err(|_| ())?
-        {
+        while let Async::Ready(Some(message)) = self.peer_rx.as_mut().unwrap().poll()?  {
             match message {
             | In::Ping(peer_id) => {
                 info!("connected to {}", peer_id);
@@ -166,7 +162,7 @@ impl<S: state::State> Future for Peer<S> {
         }
 
         // Forward incoming messages
-        while let Async::Ready(Some(message)) = self.peer_rx.poll().map_err(|_| ())?  {
+        while let Async::Ready(Some(message)) = self.peer_rx.poll()?  {
             if let In::Ping(_) = &message {} else {
                 trace!("received {:?}", message);
                 self.respond_incoming(message);
@@ -180,7 +176,7 @@ impl<S: state::State> Future for Peer<S> {
         }
 
         // Complete sends
-        if let Async::NotReady = self.peer_tx.poll_complete().map_err(|_| ())? {
+        if let Async::NotReady = self.peer_tx.poll_complete()? {
             return Ok(Async::NotReady)
         }
 
