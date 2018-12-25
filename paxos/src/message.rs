@@ -1,3 +1,11 @@
+//! # Summary
+//!
+//! This module defines message and identifier types for
+//! server-to-server communication. Almost all types, like `P1A`,
+//! `P1B`, `P2A`, and `P2B`, are equivalent to those described in
+//! Paxos Made Moderately Complex. `Command` is a Rust implementation
+//! detail.
+
 use serde_derive::{Deserialize, Serialize};
 
 use crate::state;
