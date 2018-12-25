@@ -90,6 +90,14 @@
 //! }
 //! ```
 //!
+//! # Implementation Details
+//!
+//! Everything should be documented for the curious. As for specific extensions
+//! described by the paper:
+//!
+//! - Acceptors, replicas, and leaders are all co-located
+//! - Acceptors only keep track of the most recently accepted `PValue` per slot
+//!
 //! [1]: http://paxos.systems/index.html
 
 #![feature(await_macro, async_await, futures_api, pin)]
