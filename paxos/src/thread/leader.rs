@@ -25,6 +25,7 @@ pub enum In<C: state::Command> {
     Propose(message::Proposal<C>),
     Preempt(message::Ballot),
     Adopt(Vec<message::PValue<C>>),
+    Decide(usize),
 }
 
 /// Functions as invariant-upholding command proposer.
@@ -70,6 +71,9 @@ struct Stable<S: state::State> {
 
     /// Planned proposals
     proposals: Map<usize, message::Command<S::Command>>,
+
+    /// Latest known decision
+    decided: Option<usize>,
 }
 
 impl<S: state::State> Leader<S> {
@@ -88,6 +92,7 @@ impl<S: state::State> Leader<S> {
             .unwrap_or(Stable {
                 ballot: message::Ballot { b_id: 1, l_id: id }, 
                 proposals: Map::default(), 
+                decided: None,
             });
         let leader = Leader {
             id,
@@ -108,15 +113,14 @@ impl<S: state::State> Leader<S> {
     /// Add a new proposal to the map. Directly spawn commander for it if
     /// we're already active.
     fn respond_propose(&mut self, proposal: message::Proposal<S::Command>) {
-        if self.stable.proposals.contains_key(&proposal.s_id) {
+        if self.stable.proposals.contains_key(&proposal.s_id)
+        || self.stable.decided.is_some() && self.stable.decided.unwrap() >= proposal.s_id {
             return
         }
         debug!("{:?} proposed", proposal);
         self.stable.proposals.insert(proposal.s_id, proposal.command.clone());
         self.storage.save(&self.stable);
-        if self.active {
-            self.spawn_commander(proposal);
-        }
+        if self.active { self.spawn_commander(proposal) }
     }
 
     /// Update current ballot to out-compete preempted ballot. Apply
@@ -151,6 +155,10 @@ impl<S: state::State> Leader<S> {
         self.storage.save(&self.stable);
 
         for (s_id, command) in &self.stable.proposals {
+            if self.stable.decided.is_some()
+            && *s_id <= self.stable.decided.unwrap() {
+                continue
+            }
             let proposal = message::Proposal {
                 s_id: s_id.clone(),
                 command: command.clone(),
@@ -160,6 +168,18 @@ impl<S: state::State> Leader<S> {
 
         info!("adopted with ballot {:?}", self.stable.ballot);
         self.active = true;
+    }
+
+    /// Mark a decided slot to reduce P1B message size and avoid spawning
+    /// redundant commanders for already known decisions.
+    fn respond_decide(&mut self, s_id: usize) {
+        self.stable.decided = match self.stable.decided {
+        | None                             => Some(s_id),
+        | Some(decided) if s_id >= decided => Some(s_id),
+        | Some(decided)                    => Some(decided),
+        };
+        self.stable.proposals.remove(&s_id);
+        self.storage.save(&self.stable);
     }
 
     /// Calculate the most recently accepted commands for each slot to
@@ -204,6 +224,7 @@ impl<S: state::State> Leader<S> {
             self.shared_tx.clone(),
             self.stable.ballot,
             self.count,
+            self.stable.decided,
             std::time::Duration::from_millis(self.backoff.round() as u64),
             self.timeout,
         );
@@ -221,6 +242,7 @@ impl<S: state::State> Future for Leader<S> {
             | In::Propose(proposal) => self.respond_propose(proposal),
             | In::Preempt(ballot) => self.respond_preempt(ballot),
             | In::Adopt(pvalues) => self.respond_adopt(pvalues),
+            | In::Decide(s_id) => self.respond_decide(s_id),
             }
         }
         Ok(Async::NotReady)

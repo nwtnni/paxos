@@ -151,8 +151,13 @@ impl<S: state::State> Replica<S> {
                 .read()
                 .send_client(client_id, result);
         }
+
+        // Update stable state and notify leader of decision
+        let decide = leader::In::Decide(self.stable.decision_slot);
         self.stable.decision_slot += 1;
         self.storage.save(&self.stable);
+        self.leader_tx.unbounded_send(decide)
+            .expect("[INTERNAL ERROR]: failed to send decision");
     }
 }
 

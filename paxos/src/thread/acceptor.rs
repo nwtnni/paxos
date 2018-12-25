@@ -86,16 +86,21 @@ impl<S: state::State> Acceptor<S> {
     }
 
     /// Updates highest ballot seen, and responds to the sending scout with a P1B.
-    fn send_p1a(&mut self, ballot: message::P1A) {
-        self.stable.ballot = std::cmp::max(ballot, self.stable.ballot);
+    /// Only sends PValues for slots that the scout doesn't know decisions for.
+    fn send_p1a(&mut self, p1a: message::P1A) {
+        self.stable.ballot = std::cmp::max(p1a.b_id, self.stable.ballot);
         self.storage.save(&self.stable);
+        let pvalues = self.stable.accepted.values()
+            .filter(|pvalue| p1a.decided.is_none() || pvalue.s_id > p1a.decided.unwrap())
+            .cloned()
+            .collect();
         let p1b = peer::In::P1B(message::P1B {
             a_id: self.id,
             b_id: self.stable.ballot,
-            pvalues: self.stable.accepted.values().cloned().collect(),
+            pvalues,
         });
-        trace!("sending {:?} to {}", p1b, ballot.l_id);
-        self.shared_tx.read().send(ballot.l_id, p1b)
+        trace!("sending {:?} to {}", p1b, p1a.b_id.l_id);
+        self.shared_tx.read().send(p1a.b_id.l_id, p1b)
     }
 
     /// Updates the map of accepted PValues, and responds to the sending commander with a P2B.

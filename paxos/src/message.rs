@@ -60,6 +60,7 @@ impl<C: state::Command> std::ops::Deref for Command<C> {
 pub struct Ballot {
     /// Leader-local sequence number
     pub b_id: usize,
+
     /// Leader ID
     pub l_id: usize,
 }
@@ -71,6 +72,7 @@ pub struct Ballot {
 pub struct CommanderID {
     /// Associated ballot
     pub b_id: Ballot,
+
     /// Targeted slot
     pub s_id: usize,
 }
@@ -83,14 +85,25 @@ pub struct CommanderID {
 pub struct PValue<C: state::Command> {
     /// Targeted slot
     pub s_id: usize,
+
     /// Associated ballot
     pub b_id: Ballot,
+
     /// Proposed command
     pub command: Command<C>,
 }
 
 /// Query from scout to acceptor.
-pub type P1A = Ballot;
+/// Extended with latest known decisions to reduce P1B message length.
+#[derive(Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct P1A {
+    /// Associated ballot
+    pub b_id: Ballot,
+
+    /// Leader's latest known decision
+    pub decided: Option<usize>,
+}
 
 /// Response from acceptor to scout.
 #[derive(Serialize, Deserialize)]
@@ -98,8 +111,13 @@ pub type P1A = Ballot;
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""), Hash(bound = ""), PartialEq(bound = ""), Eq(bound = ""))]
 pub struct P1B<C: state::Command> {
+    /// Acceptor ID
     pub a_id: usize,
+
+    /// Acceptor's currently adopted ballot
     pub b_id: Ballot,
+
+    /// Acceptor's most recently accepted PValues
     pub pvalues: Vec<PValue<C>>,
 }
 
@@ -112,6 +130,7 @@ pub type P2A<C> = PValue<C>;
 pub struct P2B {
     /// Acceptor ID
     pub a_id: usize,
+
     /// Acceptor's currently adopted ballot
     pub b_id: Ballot,
 }
@@ -124,6 +143,7 @@ pub struct P2B {
 pub struct Proposal<C: state::Command> {
     /// Targeted slot
     pub s_id: usize,
+
     /// Proposed command
     pub command: Command<C>,
 }

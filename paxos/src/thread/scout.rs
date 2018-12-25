@@ -17,6 +17,7 @@ pub struct Scout<S: state::State> {
     leader_tx: Tx<leader::In<S::Command>>,
     shared_tx: shared::Shared<S>,
     ballot: message::Ballot,
+    decided: Option<usize>,
     minority: usize,
     pvalues: Set<message::PValue<S::Command>>,
     timeout: timer::Interval,
@@ -29,6 +30,7 @@ impl<S: state::State> Scout<S> {
         shared_tx: shared::Shared<S>,
         ballot: message::Ballot,
         count: usize,
+        decided: Option<usize>,
         delay: time::Duration,
         timeout: time::Duration,
     ) -> Self {
@@ -46,16 +48,20 @@ impl<S: state::State> Scout<S> {
             rx: self_rx,
             leader_tx,
             shared_tx,
-            waiting,
-            minority,
             ballot,
+            decided,
+            minority,
             pvalues,
             timeout,
+            waiting,
         }
     }
 
     fn send_p1a(&self) {
-        let p1a = peer::In::P1A::<S::Command>(self.ballot);
+        let p1a = peer::In::P1A::<S::Command>(message::P1A {
+            b_id: self.ballot,
+            decided: self.decided,
+        });
         self.shared_tx
             .read()
             .narrowcast(&self.waiting, p1a);
