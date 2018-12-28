@@ -57,8 +57,8 @@ impl std::str::FromStr for Command {
         }
         | Some("put") | Some("p") => {
             iter.next()
-                .map(|message| Command::Put { message: message.to_string() })
                 .ok_or(())
+                .map(|message| Command::Put { message: message.to_string() })
         }
         | _ => Err(()),
         }
@@ -74,64 +74,101 @@ async fn run(id: usize) {
     let mut lines = BufReader::new(stdin)
         .lines()
         .filter_map(|line| line.ok());
+
+    // Main interaction loop
     loop {
         print!("> ");
         stdout.flush().unwrap();
-        if let Ok(command) = lines.next().unwrap().parse::<Command>() {
-            match command {
-            | Command::Connect { port } => {
-                let stream = format!("127.0.0.1:{}", port)
-                    .parse::<std::net::SocketAddr>()
-                    .map(|addr| std::net::TcpStream::connect(&addr).unwrap())
-                    .map(|stream| tokio::net::TcpStream::from_std(stream, &tokio::reactor::Handle::default()))
-                    .unwrap()
-                    .expect("[INTERNAL ERROR]: could not connect to server");
-                let (rx, tx) = paxos::external::new(stream);
-                reader = Some(rx);
-                writer = Some(tx);
-            }
-            | Command::Disconnect => {
-                reader = None;
-                writer = None;
-            }
-            | Command::Get => {
-                if reader.is_none() || writer.is_none() {
-                    println!("[ERROR]: not connected to a server");
-                    continue
-                }
-                counter += 1;
-                let writer = writer.as_mut().unwrap();
-                let reader = reader.as_mut().unwrap();
-                let _ = await!(
-                    writer.send(chatroom::Command {
-                        client_id: id,    
-                        local_id: counter,
-                        mode: chatroom::Mode::Get,
-                    })
-                );
-                if let Some(Ok(chatroom::Response::Messages(messages))) = await!(reader.next())  {
-                    println!("[RESPONSE]: {:?}", messages);
-                }
-            }
-            | Command::Put { message } => {
-                if writer.is_none() {
-                    println!("[ERROR]: not connected to a server");
-                    continue
-                }
-                counter += 1;
-                let writer = writer.as_mut().unwrap();
-                let _ = await!(
-                    writer.send(chatroom::Command {
-                        client_id: id,    
-                        local_id: counter,
-                        mode: chatroom::Mode::Put(message),
-                    })
-                );
-            }
-            | Command::Help => usage(),
-            }
-        } else {
+
+        // Attempt to parse command from user input
+        let command = match lines.next().unwrap().parse::<Command>() {
+        | Ok(command) => command,
+        | Err(())     => {
             println!("[ERROR]: could not parse command");
+            continue
+        }
+        };
+
+        match command {
+        | Command::Connect { port } => {
+            let addr = format!("127.0.0.1:{}", port);
+
+            // Attempt to parse port
+            let addr = match addr.parse::<std::net::SocketAddr>() {
+            | Ok(addr) => addr,
+            | _ => {
+                println!("[ERROR]: invalid port {}", port);
+                continue
+            }
+            };
+
+            // Attempt to connect to server
+            let stream = match await!(tokio::net::TcpStream::connect(&addr)) {
+            | Ok(stream) => {
+                println!("[RESPONSE]: connected to server at port {}", port);
+                stream
+            }
+            |_ => {
+                println!("[ERROR]: failed to connect to server at port {}", port);
+                continue
+            }
+            };
+
+            let (rx, tx) = paxos::external::new(stream);
+            reader = Some(rx);
+            writer = Some(tx);
+        }
+        | Command::Disconnect => {
+            reader = None;
+            writer = None;
+        }
+        | Command::Get => {
+            if reader.is_none() || writer.is_none() {
+                println!("[ERROR]: not connected to a server");
+                continue
+            }
+
+            counter += 1;
+            let writer = writer.as_mut().unwrap();
+            let reader = reader.as_mut().unwrap();
+            let command = chatroom::Command {
+                client_id: id,
+                local_id: counter,
+                mode: chatroom::Mode::Get,
+            };
+
+            // Write GET command
+            match await!(writer.send(command)) {
+            | Ok(_) => println!("[RESPONSE]: successfully sent GET request"),
+            | Err(_) => println!("[ERROR]: failed to send GET request"),
+            };
+
+            // Listen for response 
+            if let Some(Ok(chatroom::Response::Messages(messages))) = await!(reader.next())  {
+                println!("[RESPONSE]: {:?}", messages);
+            }
+        }
+        | Command::Put { message } => {
+            if reader.is_none() || writer.is_none() {
+                println!("[ERROR]: not connected to a server");
+                continue
+            }
+
+            counter += 1;
+            let writer = writer.as_mut().unwrap();
+            let command = chatroom::Command {
+                client_id: id,
+                local_id: counter,
+                mode: chatroom::Mode::Put(message),
+            };
+
+            // Write PUT command
+            match await!(writer.send(command)) {
+            | Ok(_) => println!("[RESPONSE]: successfully sent message"),
+            | Err(_) => println!("[ERROR]: failed to send message"),
+            };
+        }
+        | Command::Help => usage(),
         }
     }
 }
