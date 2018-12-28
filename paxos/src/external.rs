@@ -8,18 +8,43 @@
 //! minimal boilerplate on the sending and receiving ends.
 
 use futures::{sink, stream};
-use tokio::{io, net};
 use tokio::prelude::*;
 use tokio::codec::{FramedRead, FramedWrite, LengthDelimitedCodec, length_delimited};
 use tokio_serde_bincode::{ReadBincode, WriteBincode};
 
-type ReadTcp = io::ReadHalf<net::TcpStream>;
-type WriteTcp = io::WriteHalf<net::TcpStream>;
+/// External receiving channel. Expects length-delimited, bincode-encoded
+/// Rust data of type `T` sent via TCP.
+pub struct Rx<T>(
+    ReadBincode<
+        stream::FromErr<
+            FramedRead<
+                tokio::io::ReadHalf<tokio::net::TcpStream>,
+                LengthDelimitedCodec,
+            >,
+            bincode::Error,
+        >,
+        T
+    >
+);
 
-pub struct Rx<T>(ReadBincode<stream::FromErr<FramedRead<ReadTcp, LengthDelimitedCodec>, bincode::Error>, T>);
-pub struct Tx<T>(WriteBincode<sink::SinkFromErr<FramedWrite<WriteTcp, LengthDelimitedCodec>, bincode::Error>, T>);
+/// External transmission channel. Sends length-delimited, bincode-encoded
+/// Rust data of type `T` over TCP.
+pub struct Tx<T>(
+    WriteBincode<
+        sink::SinkFromErr<
+            FramedWrite<
+                tokio::io::WriteHalf<tokio::net::TcpStream>,
+                LengthDelimitedCodec,
+            >,
+            bincode::Error,
+        >,
+        T,
+    >
+);
 
-pub fn split<R, T>(stream: net::TcpStream) -> (Rx<R>, Tx<T>)
+/// Split a `tokio::net::TcpStream` into a pair of receiving and transmitting
+/// channels capable of reading and writing bincode-encoded data.
+pub fn new<R, T>(stream: tokio::net::TcpStream) -> (Rx<R>, Tx<T>)
 where R: serde::de::DeserializeOwned,
       T: serde::Serialize,
 {

@@ -112,11 +112,11 @@
 #[macro_use] extern crate tokio;
 
 mod config;
+pub mod external;
 mod internal;
 mod message;
 mod state;
 mod shared;
-pub mod socket;
 mod storage;
 mod thread;
 

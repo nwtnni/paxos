@@ -68,8 +68,8 @@ impl std::str::FromStr for Command {
 async fn run(id: usize) {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
-    let mut reader: Option<paxos::socket::Rx<chatroom::Response>> = None;
-    let mut writer: Option<paxos::socket::Tx<chatroom::Command>> = None;
+    let mut reader: Option<paxos::external::Rx<chatroom::Response>> = None;
+    let mut writer: Option<paxos::external::Tx<chatroom::Command>> = None;
     let mut counter = 0;
     let mut lines = BufReader::new(stdin)
         .lines()
@@ -86,7 +86,7 @@ async fn run(id: usize) {
                     .map(|stream| tokio::net::TcpStream::from_std(stream, &tokio::reactor::Handle::default()))
                     .unwrap()
                     .expect("[INTERNAL ERROR]: could not connect to server");
-                let (rx, tx) = paxos::socket::split(stream);
+                let (rx, tx) = paxos::external::new(stream);
                 reader = Some(rx);
                 writer = Some(tx);
             }

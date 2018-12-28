@@ -6,9 +6,9 @@
 use tokio::prelude::*;
 use tokio::net;
 
+use crate::external;
 use crate::internal;
 use crate::shared;
-use crate::socket;
 use crate::state;
 use crate::state::Command;
 use crate::thread::replica;
@@ -16,10 +16,10 @@ use crate::thread::replica;
 /// Represents a client that has not yet sent a message, so we don't know its ID.
 pub struct Connecting<S: state::State> {
     /// External client receiving channel
-    client_rx: Option<socket::Rx<S::Command>>,
+    client_rx: Option<external::Rx<S::Command>>,
 
     /// External client transmitting channel
-    client_tx: Option<socket::Tx<S::Response>>,
+    client_tx: Option<external::Tx<S::Response>>,
 
     /// Intra-server replica transmitting channel
     replica_tx: Option<internal::Tx<replica::In<S::Command>>>,
@@ -34,7 +34,7 @@ impl<S: state::State> Connecting<S> {
         replica_tx: internal::Tx<replica::In<S::Command>>,
         shared_tx: shared::Shared<S>,
     ) -> Self {
-        let (client_rx, client_tx) = socket::split(stream);
+        let (client_rx, client_tx) = external::new(stream);
         Connecting {
             client_rx: Some(client_rx),
             client_tx: Some(client_tx),
@@ -87,10 +87,10 @@ pub struct Client<S: state::State> {
     client_id: <S::Command as state::Command>::ClientID,
 
     /// External client receiving channel
-    client_rx: socket::Rx<S::Command>,
+    client_rx: external::Rx<S::Command>,
 
     /// External client transmitting channel
-    client_tx: socket::Tx<S::Response>,
+    client_tx: external::Tx<S::Response>,
 
     /// Intra-server replica transmitting channel
     replica_tx: internal::Tx<replica::In<S::Command>>,

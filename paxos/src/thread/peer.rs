@@ -7,11 +7,11 @@ use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 use tokio::net;
 
+use crate::external;
 use crate::internal;
 use crate::message;
 use crate::shared::Shared;
 use crate::state;
-use crate::socket;
 use crate::thread::*;
 
 /// Peer servers can receive messages between
@@ -36,10 +36,10 @@ pub struct Connecting<S: state::State> {
     self_id: usize,
 
     /// External peer receiving channel
-    peer_rx: Option<socket::Rx<In<S::Command>>>,
+    peer_rx: Option<external::Rx<In<S::Command>>>,
 
     /// External peer transmitting channel
-    peer_tx: Option<socket::Tx<In<S::Command>>>,
+    peer_tx: Option<external::Tx<In<S::Command>>>,
 
     /// Intra-server acceptor transmitting channel
     acceptor_tx: Option<internal::Tx<acceptor::In<S::Command>>>,
@@ -59,7 +59,7 @@ impl<S: state::State> Connecting<S> {
         shared_tx: Shared<S>,
         timeout: std::time::Duration,
     ) -> Self {
-        let (peer_rx, peer_tx) = socket::split(stream);
+        let (peer_rx, peer_tx) = external::new(stream);
         Connecting {
             self_id,
             peer_rx: Some(peer_rx),
@@ -119,10 +119,10 @@ pub struct Peer<S: state::State> {
     rx: internal::Rx<In<S::Command>>,
 
     /// External peer receiving channel
-    peer_rx: socket::Rx<In<S::Command>>,
+    peer_rx: external::Rx<In<S::Command>>,
 
     /// External peer transmitting channel
-    peer_tx: socket::Tx<In<S::Command>>,
+    peer_tx: external::Tx<In<S::Command>>,
 
     /// Intra-server acceptor transmitting channel
     acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
@@ -143,7 +143,7 @@ impl<S: state::State> Peer<S> {
         shared_tx: Shared<S>,
         timeout: std::time::Duration,
     ) -> Self {
-        let (peer_rx, peer_tx) = socket::split(stream);
+        let (peer_rx, peer_tx) = external::new(stream);
         let (rx, tx) = internal::new();
         shared_tx.write().connect_peer(peer_id, tx);
         info!("connected to {}", peer_id);
