@@ -23,8 +23,8 @@
 //! Currently, servers listen for clients using TCP streams, and communicate using
 //! length-delimited `bincode`-encoded Rust data. For convenience, `Sink` and `Stream`
 //! implementations of the receiving and transmitting wrappers around `TcpStream`
-//! are exposed as `socket::Rx<T>` and `socket::Tx<T>`, respectively, and they
-//! can be created from a Tokio `TcpStream` using `socket::split`.
+//! are exposed as `external::Rx<T>` and `external::Tx<T>`, respectively, and they
+//! can be created from a Tokio `TcpStream` using `external::new`.
 //!
 //! # Example
 //!
@@ -99,6 +99,8 @@
 //! - Acceptors, replicas, and leaders are all co-located
 //! - Acceptors only keep track of the most recently accepted PValue per slot
 //! - Leaders use exponential backoff for new scouts when preempted
+//!   - TODO: currently no mechanism for decreasing backoff--PMMC paper suggests linear
+//!     decrease when successful?
 //! - Leaders keep track of the latest decided slot
 //!   - Acceptors respond with PValues for later slots only
 //!   - Leaders only spawn commanders for later slots
