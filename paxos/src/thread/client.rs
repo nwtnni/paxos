@@ -21,10 +21,10 @@ pub struct Connecting<S: state::State> {
     /// External client transmitting channel
     client_tx: Option<external::Tx<S::Response>>,
 
-    /// Intra-server replica transmitting channel
+    /// Internal replica transmitting channel
     replica_tx: Option<internal::Tx<replica::In<S::Command>>>,
     
-    /// Intra-server shared transmitting channels
+    /// Internal shared transmitting channels
     shared_tx: Option<shared::Shared<S>>,
 }
 
@@ -80,7 +80,7 @@ impl<S: state::State> Future for Connecting<S> {
 /// Represents a client with known ID that is registered with
 /// the shared transmission hub.
 pub struct Client<S: state::State> {
-    /// Intra-server receiving channel
+    /// Internal receiving channel
     rx: internal::Rx<S::Response>,
 
     /// Client ID
@@ -92,10 +92,10 @@ pub struct Client<S: state::State> {
     /// External client transmitting channel
     client_tx: external::Tx<S::Response>,
 
-    /// Intra-server replica transmitting channel
+    /// Internal replica transmitting channel
     replica_tx: internal::Tx<replica::In<S::Command>>,
 
-    /// Intra-server shared transmitting channels
+    /// Internal shared transmitting channels
     shared_tx: shared::Shared<S>,
 }
 

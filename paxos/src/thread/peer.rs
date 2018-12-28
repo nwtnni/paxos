@@ -41,10 +41,10 @@ pub struct Connecting<S: state::State> {
     /// External peer transmitting channel
     peer_tx: Option<external::Tx<In<S::Command>>>,
 
-    /// Intra-server acceptor transmitting channel
+    /// Internal acceptor transmitting channel
     acceptor_tx: Option<internal::Tx<acceptor::In<S::Command>>>,
 
-    /// Intra-server shared transmitting channels
+    /// Internal shared transmitting channels
     shared_tx: Option<Shared<S>>,
 
     /// Ping interval for detecting failed connections
@@ -115,7 +115,7 @@ pub struct Peer<S: state::State> {
     /// ID of this server
     self_id: usize,
     
-    /// Intra-server receiving channel
+    /// Internal receiving channel
     rx: internal::Rx<In<S::Command>>,
 
     /// External peer receiving channel
@@ -124,10 +124,10 @@ pub struct Peer<S: state::State> {
     /// External peer transmitting channel
     peer_tx: external::Tx<In<S::Command>>,
 
-    /// Intra-server acceptor transmitting channel
+    /// Internal acceptor transmitting channel
     acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
 
-    /// Intra-server shared transmitting channels
+    /// Internal shared transmitting channels
     shared_tx: Shared<S>,
 
     /// Ping interval for detecting failed connections

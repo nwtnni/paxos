@@ -12,11 +12,11 @@
 use tokio::prelude::*;
 use futures::sync::mpsc;
 
-/// Intra-server receiving channel.
+/// Internal receiving channel.
 #[derive(Debug)]
 pub struct Rx<T>(mpsc::UnboundedReceiver<T>);
 
-/// Intra-server transmission channel. All clones send to the same receiving end.
+/// Internal transmission channel. All clones send to the same receiving end.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derive(Debug)]

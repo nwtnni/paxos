@@ -33,13 +33,13 @@ pub struct Leader<S: state::State> {
     /// Unique ID of leader
     id: usize,
 
-    /// Intra-server receiving channel
+    /// Internal receiving channel
     rx: internal::Rx<In<S::Command>>,
 
-    /// Intra-server transmitting channel
+    /// Internal transmitting channel
     tx: internal::Tx<In<S::Command>>,
 
-    /// Intra-server shared transmitting channels
+    /// Internal shared transmitting channels
     shared_tx: shared::Shared<S>,
 
     /// Adopted by a majority of acceptors and ready to spawn commanders

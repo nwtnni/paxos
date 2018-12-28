@@ -1,6 +1,6 @@
 //! # Summary
 //!
-//! This module implements a central hub for intra-server message
+//! This module implements a central hub for internal message
 //! forwarding. We wrap the central `State` type with Arc<RwLock<T>>
 //! to share the connections between concurrently running threads.
 
@@ -44,7 +44,7 @@ impl<S: state::State> Shared<S> {
     }
 }
 
-/// Collection of intra-server transmitting channels.
+/// Collection of internal transmitting channels.
 pub struct State<S: state::State> {
     id: usize,
     peer_txs: Map<usize, internal::Tx<peer::In<S::Command>>>,

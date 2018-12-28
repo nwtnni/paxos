@@ -22,13 +22,13 @@ pub struct Commander<S: state::State> {
     /// Unique ID of commander
     id: message::CommanderID,
 
-    /// Intra-server receiving channel
+    /// Internal receiving channel
     rx: internal::Rx<In>,
 
-    /// Intra-server leader transmitting channel
+    /// Internal leader transmitting channel
     leader_tx: internal::Tx<leader::In<S::Command>>,
 
-    /// Intra-server shared transmitting channels
+    /// Internal shared transmitting channels
     shared_tx: shared::Shared<S>,
 
     /// Number of acceptors constituting a minority of all acceptors

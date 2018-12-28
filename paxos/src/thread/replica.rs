@@ -28,13 +28,13 @@ pub enum In<C: state::Command> {
 /// Replicas maintain the actual state machine, and communicate
 /// with the client.
 pub struct Replica<S: state::State> {
-    /// Intra-server receiving channel
+    /// Internal receiving channel
     rx: internal::Rx<In<S::Command>>,
 
-    /// Intra-server leader transmitting channel
+    /// Internal leader transmitting channel
     leader_tx: internal::Tx<leader::In<S::Command>>,
 
-    /// Intra-server shared transmitting channels
+    /// Internal shared transmitting channels
     shared_tx: shared::Shared<S>,
 
     /// Persistent replica state across failures

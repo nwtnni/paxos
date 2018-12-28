@@ -23,13 +23,13 @@ pub type In<C> = message::P1B<C>;
 /// Competes with other scouts for adoption by
 /// a majority of acceptors.
 pub struct Scout<S: state::State> {
-    /// Intra-server receiving channel
+    /// Internal receiving channel
     rx: internal::Rx<In<S::Command>>,
 
-    /// Intra-server leader transmitting channel
+    /// Internal leader transmitting channel
     leader_tx: internal::Tx<leader::In<S::Command>>,
 
-    /// Intra-server shared transmitting channel
+    /// Internal shared transmitting channel
     shared_tx: shared::Shared<S>,
 
     /// Associated ballot
