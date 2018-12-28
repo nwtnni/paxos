@@ -111,13 +111,28 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate tokio;
 
+/// Configuring and starting a Paxos replica.
 mod config;
+
+/// Communicating with external processes.
 pub mod external;
+
+/// Communicating with internal threads.
 mod internal;
+
+/// Message types for communication.
 mod message;
+
+/// User-defined state machine.
 mod state;
+
+/// Thread-safe internal transmission hub.
 mod shared;
+
+/// Persistent storage for failure recovery.
 mod storage;
+
+/// Paxos protocol threads.
 mod thread;
 
 pub use crate::config::Config;

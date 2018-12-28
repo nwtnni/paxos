@@ -1,8 +1,15 @@
 # paxos
 
 [Paxos][1] is a fault-tolerant distributed consensus algorithm. It guarantees safety and liveness
-in asynchronous settings with less than `n / 2` crash failures, where `n` is the number of replicated
-servers.
+in asynchronous settings with less than `n / 2` crash failures, where `n` is the number of processes.
+
+This library uses Paxos to implement a generic replicated state machine (also known as Multi-Paxos).
+Assuming all commands are executed deterministically, replicas that execute 
+them in the same order will arrive at the same final state. Command logs and 
+other data are serialized to disk as `*.paxos` files for failure recovery, and 
+need to be deleted between fresh runs.
+
+## Overview
 
 This repository contains the following:
 
@@ -19,7 +26,7 @@ repository using the following command:
 > rustup override set nightly
 ```
 
-# Running Tests
+## Running Tests
 
 For more information about the test harness binary, you can run:
 
@@ -31,13 +38,13 @@ Example usage for running the `basic.json` test:
 
 ```
 > cargo build
-> cargo run --bin harness -- --server target/debug/chatroom --file tests/basic.json
+> cargo run --bin harness -- --server target/debug/chatroom-server --file tests/basic.json
 ```
 
 The test suite covers some basic failure modes and higher throughput concurrent
 writes--it's definitely not comprehensive though.
 
-# Launching Chatroom
+## Launching Chatroom
 
 For help launching a chatroom server, you can run:
 
@@ -69,7 +76,7 @@ Logging is configurable on a per-server basis by passing `-v` flags to the
 `chatroom-server` binary, if you want to see the messages being passed around
 during the execution of the protocol.
 
-# Using Library
+## Using Library
 
 To set up a replicated state machine, you have to implement the following traits:
 
@@ -150,7 +157,7 @@ fn main() {
 Take a look at the `chatroom` sub-crate for an example of how to launch and communicate
 with servers.
 
-# References
+## References
 
 1. Lamport, Leslie (1998). ["The Part-Time Parliament"][3]
 2. Lamport, Leslie (2001). ["Paxos Made Simple"][4]

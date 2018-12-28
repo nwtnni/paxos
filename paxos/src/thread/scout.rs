@@ -118,10 +118,7 @@ impl<S: state::State> Future for Scout<S> {
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         // Narrowcast P1A to acceptors who haven't responded
-        while let Async::Ready(Some(_)) = self.timeout
-            .poll()
-            .map_err(|_| ())?
-        {
+        while let Async::Ready(Some(_)) = self.timeout.poll().map_err(|_| ())? {
             self.send_p1a();
         }
 

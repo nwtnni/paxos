@@ -9,10 +9,23 @@
 //!
 //! [1]: http://paxos.systems/index.html
 
+/// Distributed memory.
 pub(crate) mod acceptor;
+
+/// Client communication.
 pub(crate) mod client;
+
+/// Command proposer.
 pub(crate) mod commander;
+
+/// Replica ambassador.
 pub(crate) mod leader;
+
+/// Peer server communication.
 pub(crate) mod peer;
+
+/// Replicated state machine.
 pub(crate) mod replica;
+
+/// Ballot proposer.
 pub(crate) mod scout;

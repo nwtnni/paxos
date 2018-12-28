@@ -178,7 +178,7 @@ impl<S: state::State> Future for Peer<S> {
 
         // Drop connections to unresponsive peers
         while let Async::Ready(Some(_)) = self.timeout.poll().map_err(|_| ())?  {
-            self.peer_tx.start_send(In::Ping(self.self_id)).map_err(|_| ())?;
+            self.peer_tx.start_send(In::Ping(self.self_id))?;
         }
 
         // Forward incoming messages
@@ -192,7 +192,7 @@ impl<S: state::State> Future for Peer<S> {
         // Forward outgoing messages
         while let Async::Ready(Some(message)) = self.rx.poll()? {
             trace!("sending {:?}", message);
-            self.peer_tx.start_send(message).map_err(|_| ())?;
+            self.peer_tx.start_send(message)?;
         }
 
         // Complete sends

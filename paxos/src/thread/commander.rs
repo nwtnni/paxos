@@ -116,18 +116,12 @@ impl<S: state::State> Future for Commander<S> {
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
 
         // Narrowcast P2A to acceptors who haven't responded
-        while let Async::Ready(Some(_)) = self.timeout
-            .poll()
-            .map_err(|_| ())?
-        {
+        while let Async::Ready(Some(_)) = self.timeout.poll().map_err(|_| ())?  {
             self.send_p2a();
         }
 
         // Respond to incoming P2B messages
-        while let Async::Ready(Some(p2b)) = self.rx
-            .poll()
-            .map_err(|_| ())?
-        {
+        while let Async::Ready(Some(p2b)) = self.rx.poll()? {
             debug!("received {:?}", p2b);
 
             // Commander has not been preempted

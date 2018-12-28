@@ -113,7 +113,7 @@ impl<S: state::State> Future for Client<S> {
         // Forward outgoing responses
         while let Async::Ready(Some(message)) = self.rx.poll()?  {
             trace!("sending {:?}", message);
-            self.client_tx.start_send(message).map_err(|_| ())?;
+            self.client_tx.start_send(message)?;
         }
 
         // Complete sends
