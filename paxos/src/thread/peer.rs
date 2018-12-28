@@ -3,11 +3,11 @@
 //! This module defines external connections to other servers.
 //! Responsible for forwarding messages to and from connected servers.
 
-use futures::sync::mpsc;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 use tokio::net;
 
+use crate::internal;
 use crate::message;
 use crate::shared::Shared;
 use crate::state;
@@ -42,7 +42,7 @@ pub struct Connecting<S: state::State> {
     peer_tx: Option<socket::Tx<In<S::Command>>>,
 
     /// Intra-server acceptor transmitting channel
-    acceptor_tx: Option<Tx<acceptor::In<S::Command>>>,
+    acceptor_tx: Option<internal::Tx<acceptor::In<S::Command>>>,
 
     /// Intra-server shared transmitting channels
     shared_tx: Option<Shared<S>>,
@@ -55,7 +55,7 @@ impl<S: state::State> Connecting<S> {
     pub fn new(
         self_id: usize,
         stream: net::tcp::TcpStream,
-        acceptor_tx: Tx<acceptor::In<S::Command>>,
+        acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
         shared_tx: Shared<S>,
         timeout: std::time::Duration,
     ) -> Self {
@@ -83,7 +83,7 @@ impl<S: state::State> Future for Connecting<S> {
                 // Peer struct. Safe to unwrap here because we always initialize with Some
                 // and always return after moving out of the option.
                 info!("connected to {}", peer_id);
-                let (tx, rx) = mpsc::unbounded();
+                let (rx, tx) = internal::new();
                 self.shared_tx.as_mut()
                     .unwrap()
                     .write()
@@ -116,7 +116,7 @@ pub struct Peer<S: state::State> {
     self_id: usize,
     
     /// Intra-server receiving channel
-    rx: Rx<In<S::Command>>,
+    rx: internal::Rx<In<S::Command>>,
 
     /// External peer receiving channel
     peer_rx: socket::Rx<In<S::Command>>,
@@ -125,7 +125,7 @@ pub struct Peer<S: state::State> {
     peer_tx: socket::Tx<In<S::Command>>,
 
     /// Intra-server acceptor transmitting channel
-    acceptor_tx: Tx<acceptor::In<S::Command>>,
+    acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
 
     /// Intra-server shared transmitting channels
     shared_tx: Shared<S>,
@@ -139,12 +139,12 @@ impl<S: state::State> Peer<S> {
         self_id: usize,
         peer_id: usize,
         stream: net::tcp::TcpStream,
-        acceptor_tx: Tx<acceptor::In<S::Command>>,
+        acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
         shared_tx: Shared<S>,
         timeout: std::time::Duration,
     ) -> Self {
         let (peer_rx, peer_tx) = socket::split(stream);
-        let (tx, rx) = mpsc::unbounded();
+        let (rx, tx) = internal::new();
         shared_tx.write().connect_peer(peer_id, tx);
         info!("connected to {}", peer_id);
         Peer {
@@ -164,17 +164,9 @@ impl<S: state::State> Peer<S> {
     /// Forward incoming messages to appropriate thread.
     fn respond_incoming(&self, message: In<S::Command>) {
         match message {
-        | In::P1A(p1a) => {
-            self.acceptor_tx
-                .unbounded_send(acceptor::In::P1A(p1a))
-                .expect("[INTERNAL ERROR]: failed to send to acceptor");
-        }
-        | In::P2A(c_id, p2a) => {
-            self.acceptor_tx
-                .unbounded_send(acceptor::In::P2A(c_id, p2a))
-                .expect("[INTERNAL ERROR]: failed to send to acceptor");
-        }
-        | message => self.shared_tx.read().forward(message),
+        | In::P1A(p1a)       => self.acceptor_tx.send(acceptor::In::P1A(p1a)),
+        | In::P2A(c_id, p2a) => self.acceptor_tx.send(acceptor::In::P2A(c_id, p2a)),
+        | message            => self.shared_tx.read().forward(message),
         }
     }
 }

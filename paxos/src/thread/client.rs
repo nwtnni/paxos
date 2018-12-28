@@ -3,15 +3,15 @@
 //! This module defines external connections to clients.
 //! Responsible for forwarding messages to and from connected clients.
 
-use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::net;
 
+use crate::internal;
 use crate::shared;
 use crate::socket;
 use crate::state;
 use crate::state::Command;
-use crate::thread::{Rx, Tx, replica};
+use crate::thread::replica;
 
 /// Represents a client that has not yet sent a message, so we don't know its ID.
 pub struct Connecting<S: state::State> {
@@ -22,7 +22,7 @@ pub struct Connecting<S: state::State> {
     client_tx: Option<socket::Tx<S::Response>>,
 
     /// Intra-server replica transmitting channel
-    replica_tx: Option<Tx<replica::In<S::Command>>>,
+    replica_tx: Option<internal::Tx<replica::In<S::Command>>>,
     
     /// Intra-server shared transmitting channels
     shared_tx: Option<shared::Shared<S>>,
@@ -31,7 +31,7 @@ pub struct Connecting<S: state::State> {
 impl<S: state::State> Connecting<S> {
     pub fn new(
         stream: net::tcp::TcpStream,
-        replica_tx: Tx<replica::In<S::Command>>,
+        replica_tx: internal::Tx<replica::In<S::Command>>,
         shared_tx: shared::Shared<S>,
     ) -> Self {
         let (client_rx, client_tx) = socket::split(stream);
@@ -56,15 +56,14 @@ impl<S: state::State> Future for Connecting<S> {
             // out of the option.
             info!("connected to {:?}", message.client_id());
             let client_id = message.client_id();
-            let (tx, rx) = mpsc::unbounded();
+            let (rx, tx) = internal::new();
             self.shared_tx.as_mut()
                 .unwrap()
                 .write()
                 .connect_client(client_id.clone(), tx);
             self.replica_tx.as_mut()
                 .unwrap()
-                .unbounded_send(replica::In::Request(message))
-                .expect("[INTERNAL ERROR]: failed to send to replica");
+                .send(replica::In::Request(message));
             return Ok(Async::Ready(Client {
                 client_id,
                 client_rx: self.client_rx.take().unwrap(),
@@ -82,7 +81,7 @@ impl<S: state::State> Future for Connecting<S> {
 /// the shared transmission hub.
 pub struct Client<S: state::State> {
     /// Intra-server receiving channel
-    rx: Rx<S::Response>,
+    rx: internal::Rx<S::Response>,
 
     /// Client ID
     client_id: <S::Command as state::Command>::ClientID,
@@ -94,7 +93,7 @@ pub struct Client<S: state::State> {
     client_tx: socket::Tx<S::Response>,
 
     /// Intra-server replica transmitting channel
-    replica_tx: Tx<replica::In<S::Command>>,
+    replica_tx: internal::Tx<replica::In<S::Command>>,
 
     /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
@@ -108,8 +107,7 @@ impl<S: state::State> Future for Client<S> {
         // Forward incoming requests
         while let Async::Ready(Some(message)) = self.client_rx.poll()?  {
             trace!("received {:?}", message);
-            self.replica_tx.unbounded_send(replica::In::Request(message))
-                .expect("[INTERNAL ERROR]: failed to send to replica")
+            self.replica_tx.send(replica::In::Request(message));
         }
 
         // Forward outgoing responses

@@ -9,12 +9,12 @@ use std::collections::HashMap as Map;
 use serde_derive::{Deserialize, Serialize};
 use tokio::prelude::*;
 
+use crate::internal;
 use crate::message;
 use crate::shared;
 use crate::state;
 use crate::storage;
 use crate::thread::peer;
-use crate::thread::Rx;
 
 /// Acceptors can only receive P1A from scouts and P2A from commanders.
 #[derive(Debug)]
@@ -29,7 +29,7 @@ pub struct Acceptor<S: state::State> {
     id: usize,
 
     /// Intra-server receiving channel
-    rx: Rx<In<S::Command>>,
+    rx: internal::Rx<In<S::Command>>,
 
     /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
@@ -72,7 +72,7 @@ impl<S: state::State> Future for Acceptor<S> {
 
 impl<S: state::State> Acceptor<S> {
     /// Initializes a new acceptor with the given transmission channels.
-    pub fn new(id: usize, rx: Rx<In<S::Command>>, shared_tx: shared::Shared<S>) -> Self {
+    pub fn new(id: usize, rx: internal::Rx<In<S::Command>>, shared_tx: shared::Shared<S>) -> Self {
         let storage_file = format!("acceptor-{:>02}.paxos", id);
         let storage = storage::Storage::new(storage_file);
         let stable = storage.load().unwrap_or_default();

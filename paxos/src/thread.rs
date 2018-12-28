@@ -16,11 +16,3 @@ pub(crate) mod leader;
 pub(crate) mod peer;
 pub(crate) mod replica;
 pub(crate) mod scout;
-
-use futures::sync::mpsc;
-
-/// Convenience type synonym for intra-server message sending.
-pub(crate) type Tx<T> = mpsc::UnboundedSender<T>;
-
-/// Convenience type synonym for intra-server message receiving.
-pub(crate) type Rx<T> = mpsc::UnboundedReceiver<T>;

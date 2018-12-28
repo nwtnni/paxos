@@ -112,6 +112,7 @@
 #[macro_use] extern crate tokio;
 
 mod config;
+mod internal;
 mod message;
 mod state;
 mod shared;

@@ -8,14 +8,14 @@
 use std::collections::HashSet as Set;
 use std::time;
 
-use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::timer;
 
+use crate::internal;
 use crate::message;
 use crate::shared;
 use crate::state;
-use crate::thread::{leader, peer, Tx, Rx};
+use crate::thread::{leader, peer};
 
 /// Scouts can only receive P1B from acceptors.
 pub type In<C> = message::P1B<C>;
@@ -24,10 +24,10 @@ pub type In<C> = message::P1B<C>;
 /// a majority of acceptors.
 pub struct Scout<S: state::State> {
     /// Intra-server receiving channel
-    rx: Rx<In<S::Command>>,
+    rx: internal::Rx<In<S::Command>>,
 
     /// Intra-server leader transmitting channel
-    leader_tx: Tx<leader::In<S::Command>>,
+    leader_tx: internal::Tx<leader::In<S::Command>>,
 
     /// Intra-server shared transmitting channel
     shared_tx: shared::Shared<S>,
@@ -53,7 +53,7 @@ pub struct Scout<S: state::State> {
 
 impl<S: state::State> Scout<S> {
     pub fn new(
-        leader_tx: Tx<leader::In<S::Command>>,
+        leader_tx: internal::Tx<leader::In<S::Command>>,
         shared_tx: shared::Shared<S>,
         ballot: message::Ballot,
         count: usize,
@@ -68,11 +68,11 @@ impl<S: state::State> Scout<S> {
             timeout,
         );
         let pvalues = Set::default();
-        let (self_tx, self_rx) = mpsc::unbounded();
-        shared_tx.write().replace_scout(self_tx);
+        let (rx, tx) = internal::new();
+        shared_tx.write().replace_scout(tx);
         debug!("starting for {:?} with delay {:?}", ballot, delay);
         Scout {
-            rx: self_rx,
+            rx,
             leader_tx,
             shared_tx,
             ballot,
@@ -102,18 +102,14 @@ impl<S: state::State> Scout<S> {
             .into_iter()
             .collect();
         let adopt = leader::In::Adopt(pvalues);
-        self.leader_tx
-            .unbounded_send(adopt)
-            .expect("[INTERNAL ERROR]: failed to send adopt");
+        self.leader_tx.send(adopt);
     }
 
     /// Notify leader that its ballot has been preempted
     fn send_preempt(&self, b_id: message::Ballot) {
         debug!("{:?} preempted by {:?}", self.ballot, b_id);
         let preempt = leader::In::Preempt::<S::Command>(b_id);
-        self.leader_tx
-            .unbounded_send(preempt)
-            .expect("[INTERNAL ERROR]: failed to send preempt");
+        self.leader_tx.send(preempt);
     }
 }
 

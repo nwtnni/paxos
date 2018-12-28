@@ -9,6 +9,7 @@ use std::collections::HashMap as Map;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 
+use crate::internal;
 use crate::message;
 use crate::shared;
 use crate::state;
@@ -28,10 +29,10 @@ pub enum In<C: state::Command> {
 /// with the client.
 pub struct Replica<S: state::State> {
     /// Intra-server receiving channel
-    rx: Rx<In<S::Command>>,
+    rx: internal::Rx<In<S::Command>>,
 
     /// Intra-server leader transmitting channel
-    leader_tx: Tx<leader::In<S::Command>>,
+    leader_tx: internal::Tx<leader::In<S::Command>>,
 
     /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
@@ -67,9 +68,9 @@ struct Stable<S: state::State> {
 impl<S: state::State> Replica<S> {
     pub fn new(
         id: usize,
-        leader_tx: Tx<leader::In<S::Command>>,
+        leader_tx: internal::Tx<leader::In<S::Command>>,
         shared_tx: shared::Shared<S>,
-        rx: Rx<In<S::Command>>,
+        rx: internal::Rx<In<S::Command>>,
     ) -> Self {
         let storage_file = format!("replica-{:>02}.paxos", id);
         let storage: storage::Storage<Stable<S>> = storage::Storage::new(storage_file);
@@ -130,8 +131,7 @@ impl<S: state::State> Replica<S> {
             command: command,
         });
 
-        self.leader_tx.unbounded_send(proposal)
-            .expect("[INTERNAL ERROR]: failed to send proposal");
+        self.leader_tx.send(proposal);
     }
 
     /// Perform the provided command by executing it on the state machine, sending
@@ -157,8 +157,7 @@ impl<S: state::State> Replica<S> {
         self.stable.proposals.remove(&self.stable.decision_slot);
         self.stable.decision_slot += 1;
         self.storage.save(&self.stable);
-        self.leader_tx.unbounded_send(decide)
-            .expect("[INTERNAL ERROR]: failed to send decision");
+        self.leader_tx.send(decide);
     }
 }
 

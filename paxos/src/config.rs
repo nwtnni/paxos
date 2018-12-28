@@ -4,9 +4,9 @@
 //! user can create an instance of `Config` with a state implementation
 //! of their choice, and then call `run` to launch the Paxos server.
 
-use futures::sync::mpsc;
 use tokio::prelude::*;
 
+use crate::internal;
 use crate::shared;
 use crate::state;
 use crate::thread;
@@ -53,10 +53,10 @@ impl<S: state::State> Config<S> {
 
     /// Launch server asynchronously.
     pub async fn run(self) {
-        let (acceptor_tx, acceptor_rx) = mpsc::unbounded();
-        let (leader_tx, leader_rx) = mpsc::unbounded();
-        let (scout_tx, _) = mpsc::unbounded();
-        let (replica_tx, replica_rx) = mpsc::unbounded();
+        let (acceptor_rx, acceptor_tx) = internal::new();
+        let (leader_rx, leader_tx) = internal::new();
+        let (_, scout_tx) = internal::new();
+        let (replica_rx, replica_tx) = internal::new();
 
         // Listen for connections to other peer servers
         let mut internal_port = format!("127.0.0.1:{}", self.id + INTERNAL_PORT)

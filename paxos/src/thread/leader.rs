@@ -10,8 +10,8 @@ use std::time;
 use serde_derive::{Serialize, Deserialize};
 use tokio::prelude::*;
 
+use crate::internal;
 use crate::message;
-use crate::thread::{Tx, Rx};
 use crate::thread::{commander, scout};
 use crate::shared;
 use crate::state;
@@ -34,10 +34,10 @@ pub struct Leader<S: state::State> {
     id: usize,
 
     /// Intra-server receiving channel
-    rx: Rx<In<S::Command>>,
+    rx: internal::Rx<In<S::Command>>,
 
     /// Intra-server transmitting channel
-    tx: Tx<In<S::Command>>,
+    tx: internal::Tx<In<S::Command>>,
 
     /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
@@ -81,8 +81,8 @@ impl<S: state::State> Leader<S> {
     pub fn new(
         id: usize,
         count: usize,
-        rx: Rx<In<S::Command>>,
-        tx: Tx<In<S::Command>>,
+        rx: internal::Rx<In<S::Command>>,
+        tx: internal::Tx<In<S::Command>>,
         shared_tx: shared::Shared<S>,
         timeout: time::Duration,
     ) -> Self {

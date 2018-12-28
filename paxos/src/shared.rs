@@ -9,9 +9,10 @@ use std::sync::Arc;
 
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+use crate::internal;
 use crate::message;
 use crate::state;
-use crate::thread::{acceptor, commander, peer, replica, scout, Tx};
+use crate::thread::{acceptor, commander, peer, replica, scout};
 
 /// Thread-safe wrapper around `State` forwarding hub.
 #[derive(Derivative)]
@@ -23,9 +24,9 @@ impl<S: state::State> Shared<S> {
     /// Initializes a message hub with the provided transmission channels.
     pub fn new(
         id: usize,
-        scout_tx: Tx<scout::In<S::Command>>,
-        replica_tx: Tx<replica::In<S::Command>>,
-        acceptor_tx: Tx<acceptor::In<S::Command>>,
+        scout_tx: internal::Tx<scout::In<S::Command>>,
+        replica_tx: internal::Tx<replica::In<S::Command>>,
+        acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
     ) -> Self {
         Shared(Arc::new(RwLock::new(
             State::new(id, scout_tx, replica_tx, acceptor_tx)
@@ -46,12 +47,12 @@ impl<S: state::State> Shared<S> {
 /// Collection of intra-server transmitting channels.
 pub struct State<S: state::State> {
     id: usize,
-    peer_txs: Map<usize, Tx<peer::In<S::Command>>>,
-    client_txs: Map<<S::Command as state::Command>::ClientID, Tx<S::Response>>,
-    commander_txs: Map<message::CommanderID, Tx<commander::In>>,
-    scout_tx: Tx<scout::In<S::Command>>,
-    replica_tx: Tx<replica::In<S::Command>>,
-    acceptor_tx: Tx<acceptor::In<S::Command>>,
+    peer_txs: Map<usize, internal::Tx<peer::In<S::Command>>>,
+    client_txs: Map<<S::Command as state::Command>::ClientID, internal::Tx<S::Response>>,
+    commander_txs: Map<message::CommanderID, internal::Tx<commander::In>>,
+    scout_tx: internal::Tx<scout::In<S::Command>>,
+    replica_tx: internal::Tx<replica::In<S::Command>>,
+    acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
 }
 
 impl<S: state::State> State<S> {
@@ -59,9 +60,9 @@ impl<S: state::State> State<S> {
     /// Initializes a message hub with the provided transmission channels.
     pub fn new(
         id: usize,
-        scout_tx: Tx<scout::In<S::Command>>,
-        replica_tx: Tx<replica::In<S::Command>>,
-        acceptor_tx: Tx<acceptor::In<S::Command>>,
+        scout_tx: internal::Tx<scout::In<S::Command>>,
+        replica_tx: internal::Tx<replica::In<S::Command>>,
+        acceptor_tx: internal::Tx<acceptor::In<S::Command>>,
     ) -> Self {
         State {
             id,
@@ -75,7 +76,7 @@ impl<S: state::State> State<S> {
     }
 
     /// Registers the provided peer channel with this hub.
-    pub fn connect_peer(&mut self, id: usize, tx: Tx<peer::In<S::Command>>) {
+    pub fn connect_peer(&mut self, id: usize, tx: internal::Tx<peer::In<S::Command>>) {
         self.peer_txs.insert(id, tx);
     }
 
@@ -85,7 +86,7 @@ impl<S: state::State> State<S> {
     }
 
     /// Registers the provided client channel with this hub.
-    pub fn connect_client(&mut self, id: <S::Command as state::Command>::ClientID, tx: Tx<S::Response>) {
+    pub fn connect_client(&mut self, id: <S::Command as state::Command>::ClientID, tx: internal::Tx<S::Response>) {
         self.client_txs.insert(id, tx);
     }
 
@@ -95,7 +96,7 @@ impl<S: state::State> State<S> {
     }
 
     /// Registers the provided commander with this hub.
-    pub fn connect_commander(&mut self, id: message::CommanderID, tx: Tx<commander::In>) {
+    pub fn connect_commander(&mut self, id: message::CommanderID, tx: internal::Tx<commander::In>) {
         self.commander_txs.insert(id, tx);
     }
 
@@ -105,7 +106,7 @@ impl<S: state::State> State<S> {
     }
 
     /// Replaces the scout channel associated with this hub.
-    pub fn replace_scout(&mut self, tx: Tx<scout::In<S::Command>>) {
+    pub fn replace_scout(&mut self, tx: internal::Tx<scout::In<S::Command>>) {
         std::mem::replace(&mut self.scout_tx, tx);
     }
 
@@ -113,32 +114,30 @@ impl<S: state::State> State<S> {
     pub fn send_commander(&self, c_id: message::CommanderID, message: commander::In) {
         if let Some(tx) = self.commander_txs.get(&c_id) {
             // Commander may have received majority and dropped receiving end
-            tx.unbounded_send(message).ok();
+            tx.try_send(message);
         }
     }
 
     /// Forwards a message to the replica sub-thread.
     pub fn send_replica(&self, message: replica::In<S::Command>) {
-        self.replica_tx.unbounded_send(message)
-            .expect("[INTERNAL ERROR]: failed to send to replica");
+        self.replica_tx.send(message);
     }
 
     /// Forwards a message to the scout sub-thread.
     pub fn send_scout(&self, message: scout::In<S::Command>) {
         // Scout might have received a majority and dropped receiving end
-        self.scout_tx.unbounded_send(message).ok();
+        self.scout_tx.try_send(message);
     }
 
     /// Forwards a message to the acceptor sub-thread.
     pub fn send_acceptor(&self, message: acceptor::In<S::Command>) {
-        self.acceptor_tx.unbounded_send(message)
-            .expect("[INTERNAL ERROR]: failed to send to acceptor");
+        self.acceptor_tx.send(message);
     }
 
     /// Forwards a message to an external client.
     pub fn send_client(&self, id: <S::Command as state::Command>::ClientID, message: S::Response) {
         if let Some(tx) = self.client_txs.get(&id) {
-            let _ = tx.unbounded_send(message);
+            tx.try_send(message);
         }
     }
 
@@ -147,7 +146,7 @@ impl<S: state::State> State<S> {
         if id == self.id {
             self.forward(message);
         } else if let Some(tx) = self.peer_txs.get(&id) {
-            let _ = tx.unbounded_send(message);
+            tx.try_send(message);
         }
     }
 
@@ -175,7 +174,7 @@ impl<S: state::State> State<S> {
     /// Forwards a message to all connected peer servers.
     pub fn broadcast(&self, message: peer::In<S::Command>) {
         for tx in self.peer_txs.values() {
-            let _ = tx.unbounded_send(message.clone());
+            tx.try_send(message.clone());
         }
         self.forward(message);
     }

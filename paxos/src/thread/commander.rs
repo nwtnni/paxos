@@ -5,14 +5,14 @@
 
 use std::collections::HashSet as Set;
 
-use futures::sync::mpsc;
 use tokio::prelude::*;
 use tokio::timer;
 
+use crate::internal;
 use crate::message;
 use crate::shared;
 use crate::state;
-use crate::thread::{leader, peer, Tx, Rx};
+use crate::thread::{leader, peer};
 
 /// Commanders can only receive P2B from acceptors.
 pub type In = message::P2B;
@@ -23,10 +23,10 @@ pub struct Commander<S: state::State> {
     id: message::CommanderID,
 
     /// Intra-server receiving channel
-    rx: Rx<In>,
+    rx: internal::Rx<In>,
 
     /// Intra-server leader transmitting channel
-    leader_tx: Tx<leader::In<S::Command>>,
+    leader_tx: internal::Tx<leader::In<S::Command>>,
 
     /// Intra-server shared transmitting channels
     shared_tx: shared::Shared<S>,
@@ -46,7 +46,7 @@ pub struct Commander<S: state::State> {
 
 impl<S: state::State> Commander<S> {
     pub fn new(
-        leader_tx: Tx<leader::In<S::Command>>,
+        leader_tx: internal::Tx<leader::In<S::Command>>,
         shared_tx: shared::Shared<S>,
         pvalue: message::PValue<S::Command>,
         count: usize,
@@ -54,7 +54,7 @@ impl<S: state::State> Commander<S> {
     ) -> Self {
         let waiting = (0..count).collect();
         let minority = (count - 1) / 2;
-        let (self_tx, self_rx) = mpsc::unbounded();
+        let (rx, tx) = internal::new();
         let id = message::CommanderID {
             b_id: pvalue.b_id,
             s_id: pvalue.s_id,
@@ -64,10 +64,10 @@ impl<S: state::State> Commander<S> {
             timeout,
         );
         debug!("starting for {:?}", id);
-        shared_tx.write().connect_commander(id, self_tx);
+        shared_tx.write().connect_commander(id, tx);
         let commander = Commander {
             id,
-            rx: self_rx,
+            rx,
             leader_tx,
             shared_tx,
             waiting,
@@ -92,11 +92,11 @@ impl<S: state::State> Commander<S> {
 
     /// Broadcast decisions to all replicas
     fn send_decide(&self) {
+        debug!("{:?} decided", self.pvalue);
         let decide = message::Proposal {
             s_id: self.pvalue.s_id,
             command: self.pvalue.command.clone(),
         };
-        debug!("{:?} decided", self.pvalue);
         self.shared_tx
             .read()
             .broadcast(peer::In::Decision(decide));
@@ -104,11 +104,9 @@ impl<S: state::State> Commander<S> {
 
     /// Notify leader that its ballot has been preempted
     fn send_preempt(&self, b_id: message::Ballot) {
-        let preempt = leader::In::Preempt::<S::Command>(b_id);
         debug!("{:?} preempted", self.pvalue);
-        self.leader_tx
-            .unbounded_send(preempt)
-            .expect("[INTERNAL ERROR]: failed to send preempted");
+        let preempt = leader::In::Preempt::<S::Command>(b_id);
+        self.leader_tx.send(preempt);
     }
 }
 
