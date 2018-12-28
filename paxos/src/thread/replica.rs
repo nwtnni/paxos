@@ -15,7 +15,7 @@ use crate::shared;
 use crate::state;
 use crate::state::Command;
 use crate::storage;
-use crate::thread::*;
+use crate::thread::leader;
 
 /// Replicas can only receive requests from the client,
 /// or decisions from commanders.

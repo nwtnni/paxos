@@ -12,7 +12,7 @@ use crate::internal;
 use crate::message;
 use crate::shared::Shared;
 use crate::state;
-use crate::thread::*;
+use crate::thread::acceptor;
 
 /// Peer servers can receive messages between
 /// scouts, commanders, and acceptors, decisions

@@ -12,10 +12,10 @@ use tokio::prelude::*;
 
 use crate::internal;
 use crate::message;
-use crate::thread::{commander, scout};
 use crate::shared;
 use crate::state;
 use crate::storage;
+use crate::thread::{commander, scout};
 
 /// Leaders can only receive proposals from replicas,
 /// preempts from scouts or commanders, and adopts
