@@ -23,7 +23,7 @@ and therefore requires Rust Nightly for now. You can override your default compi
 repository using the following command:
 
 ```
-> rustup override set nightly
+> rustup override set nightly-2018-12-24
 ```
 
 ## Running Tests
