@@ -62,8 +62,8 @@ impl<S: state::State> Future for Acceptor<S> {
         while let Async::Ready(Some(message)) = self.rx.poll()? {
             trace!("received {:?}", message);
             match message {
-                In::P1A(m) => self.send_p1a(m),
-                In::P2A(c_id, m) => self.send_p2a(c_id, m),
+                In::P1A(m) => self.respond_p1a(m),
+                In::P2A(c_id, m) => self.respond_p2a(c_id, m),
             }
         }
         Ok(Async::NotReady)
@@ -87,7 +87,7 @@ impl<S: state::State> Acceptor<S> {
 
     /// Updates highest ballot seen, and responds to the sending scout with a P1B.
     /// Only sends PValues for slots that the scout doesn't know decisions for.
-    fn send_p1a(&mut self, p1a: message::P1A) {
+    fn respond_p1a(&mut self, p1a: message::P1A) {
         self.stable.ballot = std::cmp::max(p1a.b_id, self.stable.ballot);
         self.storage.save(&self.stable);
         let pvalues = self.stable.accepted.values()
@@ -104,7 +104,7 @@ impl<S: state::State> Acceptor<S> {
     }
 
     /// Updates the map of accepted PValues, and responds to the sending commander with a P2B.
-    fn send_p2a(&mut self, c_id: message::CommanderID, pvalue: message::P2A<S::Command>) {
+    fn respond_p2a(&mut self, c_id: message::CommanderID, pvalue: message::P2A<S::Command>) {
         if pvalue.b_id >= self.stable.ballot {
             self.stable.ballot = pvalue.b_id;
             self.stable.accepted.insert(pvalue.s_id, pvalue.clone());
